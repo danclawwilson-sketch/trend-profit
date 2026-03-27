@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETH 策略模擬器</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700;900&display=swap');
+
+:root{
+  --bg:#04080f;
+  --bg2:#070d18;
+  --sur:#0a1220;
+  --sur2:#0d1a2e;
+  --brd:#0e2040;
+  --brd2:#1a3560;
+  --acc:#00ffe7;
+  --acc2:#0066ff;
+  --acc3:#7000ff;
+  --bull:#00ff88;
+  --bear:#ff2d55;
+  --range:#ffb800;
+  --txt:#c8daf0;
+  --txt2:#7a9cc0;
+  --mut:#3a5a80;
+  --mono:'Share Tech Mono',monospace;
+  --sans:'Exo 2',sans-serif;
+}
+
+/* BTC theme overrides — applied via body.btc-theme */
+body.btc-theme{
+  --acc:#f7931a;
+  --acc2:#e07b10;
+  --acc3:#c46a00;
+}
+body.btc-theme .panel::before{
+  background:linear-gradient(90deg,transparent,rgba(247,147,26,0.25),transparent);
+}
+body.btc-theme .hdr::before{
+  background:linear-gradient(90deg,transparent,var(--acc),transparent);
+}
+body.btc-theme input[type=number]:focus{
+  border-color:var(--acc);
+  box-shadow:0 0 0 1px rgba(247,147,26,0.2),0 0 20px rgba(247,147,26,0.1);
+}
+body.btc-theme .tog button.on{
+  background:rgba(247,147,26,0.15);color:var(--acc);border:1px solid rgba(247,147,26,0.35);
+}
+body.btc-theme .rnote{
+  background:rgba(247,147,26,0.05);border:1px solid rgba(247,147,26,0.2);border-left:2px solid var(--acc);
+}
+body.btc-theme .rnote span{color:var(--acc);}
+body.btc-theme .stitle{color:var(--acc);}
+body.btc-theme .btnp{color:var(--acc);border:1px solid var(--acc);box-shadow:0 0 15px rgba(247,147,26,0.15);}
+body.btc-theme .btnp:hover{background:rgba(247,147,26,0.12);box-shadow:0 0 25px rgba(247,147,26,0.3);}
+body.btc-theme .pbtn:hover,body.btc-theme .pbtn.on{border-color:var(--acc);color:var(--acc);background:rgba(247,147,26,0.07);}
+body.btc-theme .btab.on{color:var(--acc);border-bottom-color:var(--acc);text-shadow:0 0 10px rgba(247,147,26,0.4);}
+body.btc-theme .eth-val{color:var(--acc);text-shadow:0 0 20px rgba(247,147,26,0.6);}
+body.btc-theme .rv.acc{color:var(--acc);text-shadow:0 0 10px rgba(247,147,26,0.3);}
+body.btc-theme body::before{opacity:0.6;}
+body.btc-theme .si:hover{border-color:rgba(247,147,26,0.25);}
+body.btc-theme .si::after{background:linear-gradient(90deg,transparent,rgba(247,147,26,0.15),transparent);}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  background:var(--bg);
+  color:var(--txt);
+  font-family:var(--sans);
+  font-size:18px;
+  min-height:100vh;
+  padding:24px 20px;
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% -10%,rgba(0,102,255,0.12) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 60% at 90% 90%,rgba(112,0,255,0.07) 0%,transparent 70%),
+    linear-gradient(180deg,#04080f 0%,#050c18 100%);
+  overflow-x:hidden;
+}
+
+/* ── Scanline overlay ── */
+body::before{
+  content:'';position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+}
+
+/* ── Grid bg ── */
+body::after{
+  content:'';position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(0,102,255,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,102,255,0.04) 1px,transparent 1px);
+  background-size:60px 60px;
+  transition:background-image 0.5s;
+}
+body.btc-theme::after{
+  background-image:
+    linear-gradient(rgba(247,147,26,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(247,147,26,0.04) 1px,transparent 1px);
+}
+
+/* ── Header ── */
+.hdr{
+  text-align:center;margin-bottom:32px;padding:28px 0 24px;
+  position:relative;z-index:1;
+  border-bottom:1px solid rgba(0,255,231,0.12);
+}
+.hdr::before{
+  content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:320px;height:1px;background:linear-gradient(90deg,transparent,var(--acc),transparent);
+}
+.hdr h1{
+  font-family:var(--mono);font-size:31px;letter-spacing:8px;text-transform:uppercase;
+  color:#fff;font-weight:400;
+  text-shadow:0 0 40px rgba(0,255,231,0.5),0 0 80px rgba(0,255,231,0.2);
+  animation:hdrGlow 3s ease-in-out infinite alternate;
+}
+@keyframes hdrGlow{from{text-shadow:0 0 30px rgba(0,255,231,0.4),0 0 60px rgba(0,255,231,0.15);}to{text-shadow:0 0 50px rgba(0,255,231,0.7),0 0 100px rgba(0,255,231,0.3);}}
+@keyframes hdrGlowBtc{from{text-shadow:0 0 30px rgba(247,147,26,0.5),0 0 60px rgba(247,147,26,0.2);}to{text-shadow:0 0 50px rgba(247,147,26,0.8),0 0 100px rgba(247,147,26,0.35);}}
+body.btc-theme .hdr h1{animation:hdrGlowBtc 3s ease-in-out infinite alternate;}
+body.btc-theme .eth-val{animation:pulse 2s ease-in-out infinite;}
+.hdr p{color:var(--txt2);font-size:16px;margin-top:8px;letter-spacing:3px;text-transform:uppercase;font-family:var(--mono);}
+
+/* ── ETH price bar ── */
+.eth-bar{
+  display:flex;align-items:center;justify-content:center;gap:20px;
+  background:linear-gradient(135deg,rgba(0,255,231,0.05),rgba(0,102,255,0.05));
+  border:1px solid rgba(0,255,231,0.2);
+  border-radius:4px;padding:12px 24px;margin-bottom:24px;
+  font-family:var(--mono);font-size:16px;letter-spacing:2px;
+  position:relative;z-index:1;
+  box-shadow:0 0 30px rgba(0,255,231,0.05),inset 0 1px 0 rgba(0,255,231,0.1);
+}
+.eth-bar::before{content:'◈ LIVE';position:absolute;top:-9px;left:20px;font-family:var(--mono);font-size:12px;color:var(--acc);letter-spacing:3px;background:var(--bg);padding:0 8px;}
+.eth-val{color:var(--acc);font-size:31px;font-weight:400;text-shadow:0 0 20px rgba(0,255,231,0.6);animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.85;}}
+.eth-tm{color:var(--mut);font-size:13px;}
+.eth-label{color:var(--txt2);font-size:14px;letter-spacing:2px;}
+
+/* ── Panels ── */
+.panel{
+  background:linear-gradient(135deg,rgba(10,18,32,0.9),rgba(7,13,24,0.95));
+  border:1px solid var(--brd2);
+  border-radius:4px;padding:22px;margin-bottom:20px;
+  position:relative;z-index:1;
+  box-shadow:0 4px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.panel::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,255,231,0.3),transparent);
+}
+
+/* ── Section title ── */
+.stitle{
+  font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:5px;
+  color:var(--acc);margin-bottom:18px;padding-bottom:10px;
+  border-bottom:1px solid rgba(0,255,231,0.1);
+  display:flex;align-items:center;gap:10px;
+}
+.stitle::before{content:'//';opacity:0.5;}
+
+/* ── Fields ── */
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;}
+.f{display:flex;flex-direction:column;gap:6px;flex:1;min-width:105px;}
+label{font-family:var(--mono);font-size:12px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;}
+
+input[type=number]{
+  background:rgba(0,0,0,0.4);
+  border:1px solid var(--brd2);
+  color:var(--txt);
+  border-radius:3px;
+  padding:8px 12px;
+  font-family:var(--mono);font-size:17px;width:100%;
+  transition:border-color 0.2s,box-shadow 0.2s;
+  letter-spacing:1px;
+}
+input[type=number]:focus{
+  outline:none;border-color:var(--acc);
+  box-shadow:0 0 0 1px rgba(0,255,231,0.2),0 0 20px rgba(0,255,231,0.1);
+}
+input[type=number]:hover{border-color:var(--brd2+20);}
+
+/* ── Alloc bar ── */
+.abar{display:flex;height:3px;border-radius:2px;overflow:hidden;margin-top:12px;gap:2px;}
+.aseg{height:100%;transition:width 0.5s cubic-bezier(0.4,0,0.2,1);}
+
+/* ── Strategy grid ── */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:20px;}
+
+.sc{
+  background:linear-gradient(135deg,rgba(10,18,32,0.95),rgba(5,10,20,0.98));
+  border:1px solid var(--brd2);
+  border-radius:4px;padding:20px;position:relative;overflow:hidden;
+  transition:border-color 0.3s,box-shadow 0.3s;
+  z-index:1;
+}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.sc.bull::before{background:linear-gradient(90deg,transparent,var(--bull),rgba(0,255,136,0.3));}
+.sc.bear::before{background:linear-gradient(90deg,transparent,var(--bear),rgba(255,45,85,0.3));}
+.sc.range::before{background:linear-gradient(90deg,transparent,var(--range),rgba(255,184,0,0.3));}
+
+/* corner decorations */
+.sc::after{
+  content:'';position:absolute;bottom:0;right:0;width:60px;height:60px;
+  background:inherit;border:inherit;
+  clip-path:polygon(100% 0,100% 100%,0 100%);
+  opacity:0.3;
+}
+.sc.bull:hover{border-color:rgba(0,255,136,0.4);box-shadow:0 0 30px rgba(0,255,136,0.08),inset 0 0 60px rgba(0,255,136,0.03);}
+.sc.bear:hover{border-color:rgba(255,45,85,0.4);box-shadow:0 0 30px rgba(255,45,85,0.08),inset 0 0 60px rgba(255,45,85,0.03);}
+.sc.range:hover{border-color:rgba(255,184,0,0.4);box-shadow:0 0 30px rgba(255,184,0,0.08),inset 0 0 60px rgba(255,184,0,0.03);}
+
+.chd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.cttl{display:flex;align-items:center;gap:8px;}
+.cttl h3{font-family:var(--sans);font-size:17px;font-weight:600;color:#fff;letter-spacing:1px;}
+
+.stag{
+  font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:2px;
+  font-weight:400;text-transform:uppercase;letter-spacing:3px;
+}
+.bull .stag{background:rgba(0,255,136,0.1);color:var(--bull);border:1px solid rgba(0,255,136,0.3);}
+.bear .stag{background:rgba(255,45,85,0.1);color:var(--bear);border:1px solid rgba(255,45,85,0.3);}
+.range .stag{background:rgba(255,184,0,0.1);color:var(--range);border:1px solid rgba(255,184,0,0.3);}
+
+/* ── Toggle ── */
+.tog{display:flex;background:rgba(0,0,0,0.5);border-radius:3px;padding:2px;gap:2px;border:1px solid var(--brd2);}
+.tog button{
+  padding:4px 12px;border:none;background:none;color:var(--mut);
+  font-size:14px;border-radius:2px;cursor:pointer;
+  transition:all 0.2s;font-family:var(--mono);letter-spacing:1px;
+  text-transform:uppercase;
+}
+.tog button.on{background:rgba(0,255,231,0.12);color:var(--acc);border:1px solid rgba(0,255,231,0.25);}
+
+/* ── Ratio note ── */
+.rnote{
+  background:rgba(0,255,231,0.04);border:1px solid rgba(0,255,231,0.15);
+  border-left:2px solid var(--acc);
+  border-radius:2px;padding:7px 12px;font-family:var(--mono);font-size:13px;
+  color:var(--txt2);margin-bottom:10px;display:none;letter-spacing:1px;
+}
+.rnote.show{display:block;}
+.rnote span{color:var(--acc);}
+
+/* ── Input grids ── */
+.cg2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.cg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;}
+
+/* ── Mini chart ── */
+.mc{margin:12px 0;height:70px;position:relative;border:1px solid var(--brd);border-radius:2px;overflow:hidden;}
+.mc canvas{width:100%;height:100%;}
+
+/* ── Result box ── */
+.rb{
+  background:rgba(0,0,0,0.3);
+  border:1px solid var(--brd2);
+  border-radius:3px;padding:12px;margin-top:8px;
+}
+.rr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.03);}
+.rr:last-child{margin-bottom:0;border-bottom:none;}
+.rl{font-family:var(--mono);font-size:13px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;}
+.rv{font-family:var(--mono);font-size:16px;color:var(--txt);}
+.rv.acc{color:var(--acc);text-shadow:0 0 10px rgba(0,255,231,0.3);}
+.rv.bull{color:var(--bull);}
+.rv.bear{color:var(--bear);}
+.rv.rng{color:var(--range);}
+
+/* ── Summary grid ── */
+.sgd{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px;}
+.si{
+  background:rgba(0,0,0,0.3);border:1px solid var(--brd2);border-radius:3px;
+  padding:14px;text-align:center;position:relative;overflow:hidden;
+  transition:border-color 0.2s;
+}
+.si:hover{border-color:rgba(0,255,231,0.2);}
+.si::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,231,0.15),transparent);}
+.si .sl{font-family:var(--mono);font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;}
+.si .sv{font-family:var(--mono);font-size:22px;font-weight:400;}
+.si .ss{font-family:var(--mono);font-size:13px;color:var(--mut);margin-top:4px;}
+
+/* ── Buttons ── */
+.btn{padding:8px 20px;border:none;border-radius:2px;cursor:pointer;font-family:var(--mono);font-size:14px;transition:all 0.2s;letter-spacing:2px;text-transform:uppercase;}
+.btnp{
+  background:transparent;color:var(--acc);
+  border:1px solid var(--acc);
+  box-shadow:0 0 15px rgba(0,255,231,0.15);
+}
+.btnp:hover{background:rgba(0,255,231,0.1);box-shadow:0 0 25px rgba(0,255,231,0.3);transform:translateY(-1px);}
+
+/* ── Period buttons ── */
+.pbtn{
+  padding:7px 16px;border:1px solid var(--brd2);border-radius:2px;
+  background:rgba(0,0,0,0.3);color:var(--txt2);font-size:14px;cursor:pointer;
+  transition:all 0.2s;font-family:var(--mono);letter-spacing:1px;
+}
+.pbtn:hover,.pbtn.on{border-color:var(--acc);color:var(--acc);background:rgba(0,255,231,0.06);}
+.pbtn.on{box-shadow:0 0 10px rgba(0,255,231,0.1);}
+
+/* ── Backtest ── */
+.bt-load{text-align:center;padding:40px;font-family:var(--mono);font-size:16px;color:var(--mut);letter-spacing:2px;}
+.spin{display:inline-block;width:28px;height:28px;border:1px solid var(--brd2);border-top-color:var(--acc);border-radius:50%;animation:sp 1s linear infinite;margin-bottom:12px;}
+@keyframes sp{to{transform:rotate(360deg);}}
+
+.bsm{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:18px;}
+.bst{
+  background:rgba(0,0,0,0.3);border:1px solid var(--brd2);border-radius:3px;
+  padding:13px;text-align:center;
+}
+.bst .bl{font-family:var(--mono);font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:2px;margin-bottom:7px;}
+.bst .bv{font-family:var(--mono);font-size:19px;font-weight:400;}
+.bst .bs{font-family:var(--mono);font-size:13px;color:var(--mut);margin-top:4px;}
+
+/* ── Trigger stats ── */
+.tstat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px;}
+.tstat{
+  background:rgba(0,0,0,0.3);border:1px solid var(--brd2);border-radius:3px;padding:14px;
+}
+.ts-title{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:3px;margin-bottom:12px;}
+.ts-row{display:flex;justify-content:space-between;margin-bottom:6px;font-family:var(--mono);font-size:14px;}
+.ts-row span:first-child{color:var(--txt2);}
+.ts-bar-wrap{height:3px;background:rgba(255,255,255,0.05);border-radius:2px;margin-top:4px;margin-bottom:8px;overflow:hidden;}
+.ts-bar{height:100%;border-radius:2px;transition:width 0.8s cubic-bezier(0.4,0,0.2,1);}
+
+/* ── Chart box ── */
+.bcbox{
+  width:100%;height:240px;background:rgba(0,0,0,0.3);
+  border:1px solid var(--brd2);border-radius:3px;padding:10px;margin-bottom:14px;position:relative;
+}
+.bcbox canvas{position:absolute;top:10px;left:10px;width:calc(100% - 20px);height:calc(100% - 20px);}
+
+/* ── Backtest tabs ── */
+.btabs{display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--brd2);overflow-x:auto;}
+.btab{
+  padding:8px 18px;border:none;background:none;font-size:13px;
+  color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;
+  margin-bottom:-1px;transition:all 0.2s;font-family:var(--mono);
+  letter-spacing:2px;text-transform:uppercase;white-space:nowrap;
+}
+.btab:hover{color:var(--txt2);}
+.btab.on{color:var(--acc);border-bottom-color:var(--acc);text-shadow:0 0 10px rgba(0,255,231,0.4);}
+
+/* ── Log table ── */
+.logtw{overflow-x:auto;max-height:440px;overflow-y:auto;border:1px solid var(--brd2);border-radius:3px;}
+.logtw::-webkit-scrollbar{width:4px;height:4px;}
+.logtw::-webkit-scrollbar-track{background:rgba(0,0,0,0.3);}
+.logtw::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px;}
+.logt{width:100%;border-collapse:collapse;white-space:nowrap;}
+.logt th{
+  background:rgba(0,0,0,0.5);padding:8px 11px;
+  font-family:var(--mono);font-size:12px;text-transform:uppercase;
+  letter-spacing:2px;color:var(--mut);border-bottom:1px solid var(--brd2);
+  position:sticky;top:0;z-index:1;
+}
+.logt td{padding:7px 11px;border-bottom:1px solid rgba(14,32,64,0.6);font-family:var(--mono);font-size:14px;}
+.logt tr:hover td{background:rgba(0,255,231,0.02);}
+
+/* ── Status tags ── */
+.tag-tri{
+  background:rgba(0,255,136,0.1);color:var(--bull);
+  border:1px solid rgba(0,255,136,0.3);
+  border-radius:2px;padding:2px 7px;font-size:13px;font-family:var(--mono);
+  letter-spacing:1px;
+}
+.tag-base{
+  background:rgba(58,90,128,0.15);color:var(--mut);
+  border:1px solid rgba(58,90,128,0.3);
+  border-radius:2px;padding:2px 7px;font-size:13px;font-family:var(--mono);
+  letter-spacing:1px;
+}
+.tag-hi{
+  background:rgba(255,184,0,0.1);color:var(--range);
+  border:1px solid rgba(255,184,0,0.3);
+  border-radius:2px;padding:2px 7px;font-size:13px;font-family:var(--mono);
+  letter-spacing:1px;
+}
+
+/* ── Utility ── */
+.positive{color:var(--bull);}
+.negative{color:var(--bear);}
+.neutral{color:var(--mut);}
+.divider{height:1px;background:var(--brd2);margin:12px 0;}
+
+/* ── Dot indicator ── */
+.sdot{
+  width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px;
+  box-shadow:0 0 6px currentColor;
+}
+
+/* Preset buttons */
+.preset-row{
+  display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;
+}
+.preset-label{
+  font-family:var(--mono);font-size:10px;color:var(--mut);
+  letter-spacing:2px;text-transform:uppercase;margin-right:4px;
+}
+.preset-btn{
+  font-family:var(--mono);font-size:12px;letter-spacing:2px;
+  padding:5px 14px;border-radius:2px;cursor:pointer;transition:all 0.18s;
+  background:transparent;color:var(--txt2);border:1px solid var(--brd2);
+  text-transform:uppercase;
+}
+.preset-btn:hover{border-color:var(--acc);color:var(--acc);background:rgba(0,255,231,0.06);}
+.preset-active{
+  background:rgba(0,255,231,0.12)!important;
+  color:var(--acc)!important;
+  border-color:var(--acc)!important;
+  box-shadow:0 0 10px rgba(0,255,231,0.15);
+}
+body.btc-theme .preset-btn:hover{border-color:var(--acc);color:var(--acc);background:rgba(247,147,26,0.06);}
+body.btc-theme .preset-active{background:rgba(247,147,26,0.12)!important;color:var(--acc)!important;border-color:var(--acc)!important;box-shadow:0 0 10px rgba(247,147,26,0.2);}
+
+@media(max-width:768px){
+  .sgrid{grid-template-columns:1fr;}
+  .cg2{grid-template-columns:1fr;}
+  .btabs{flex-wrap:nowrap;overflow-x:scroll;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>⬡ <span id="hdrSymbol">ETH</span> STRATEGY SIMULATOR</h1>
+  <p>趨勢智盈看漲 · 趨勢智盈看跌 · 區間盈利 — 7筆滾動複利 · Binance Live</p>
+  <div style="display:flex;justify-content:center;gap:10px;margin-top:14px;">
+    <button onclick="switchSymbol('ETH')" id="sym-btn-ETH"
+      style="font-family:var(--mono);font-size:13px;letter-spacing:3px;padding:7px 22px;
+             border-radius:2px;cursor:pointer;transition:all 0.2s;
+             background:rgba(0,255,231,0.12);color:var(--acc);border:1px solid var(--acc);
+             box-shadow:0 0 12px rgba(0,255,231,0.2);">
+      ⬡ ETH
+    </button>
+    <button onclick="switchSymbol('BTC')" id="sym-btn-BTC"
+      style="font-family:var(--mono);font-size:13px;letter-spacing:3px;padding:7px 22px;
+             border-radius:2px;cursor:pointer;transition:all 0.2s;
+             background:transparent;color:var(--mut);border:1px solid var(--brd2);">
+      ◈ BTC
+    </button>
+  </div>
+</div>
+
+<div class="eth-bar">
+  <span class="eth-label" id="priceLabel">ETH / USDT</span>
+  <span class="eth-val" id="ethPriceDisplay">──────</span>
+  <span class="eth-tm" id="ethPriceTime"></span>
+  <button class="btn btnp" onclick="fetchEthPrice()" style="padding:5px 14px;font-size:12px;">↻ SYNC</button>
+</div>
+
+<!-- Global Settings -->
+<div class="panel">
+  <div class="stitle">全域設定</div>
+  <div class="row">
+    <div class="f"><label id="capitalLabel">初始資金 (ETH)</label><input type="number" id="totalEth" value="45" step="1" min="1" onchange="recalcAll()"></div>
+    <div class="f"><label>資金分配 S1 (%)</label><input type="number" id="allocS1" value="33" step="1" min="0" max="100" onchange="autoBalance(1)"></div>
+    <div class="f"><label>資金分配 S2 (%)</label><input type="number" id="allocS2" value="33" step="1" min="0" max="100" onchange="autoBalance(2)"></div>
+    <div class="f"><label>資金分配 S3 (%)</label><input type="number" id="allocS3" value="34" step="1" min="0" max="100" onchange="autoBalance(3)"></div>
+  </div>
+  <div class="abar" id="abar">
+    <div class="aseg" style="background:var(--bull);width:33%"></div>
+    <div class="aseg" style="background:var(--bear);width:33%"></div>
+    <div class="aseg" style="background:var(--range);width:34%"></div>
+  </div>
+</div>
+
+<!-- Strategy Cards -->
+<div class="sgrid">
+
+  <div class="sc bull">
+    <div class="chd">
+      <div class="cttl">
+        <span class="sdot" style="background:var(--bull);color:var(--bull)"></span>
+        <h3>策略一：趨勢智盈看漲</h3>
+        <span class="stag">BULL</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="tog">
+          <button id="s1ms" class="on" onclick="setMode(1,'single')">SINGLE</button>
+          <button id="s1mr" onclick="setMode(1,'split')">ROLL</button>
+        </div>
+        <div id="s1-pool-ctrl" style="display:none;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--mut);">
+          水池數
+          <button onclick="adjPool(1,-1)" style="background:rgba(0,255,231,0.08);border:1px solid var(--brd2);color:var(--acc);width:22px;height:22px;border-radius:2px;cursor:pointer;font-family:var(--mono);font-size:14px;">−</button>
+          <span id="s1-pool-val" style="color:var(--acc);min-width:20px;text-align:center;">7</span>
+          <button onclick="adjPool(1,1)" style="background:rgba(0,255,231,0.08);border:1px solid var(--brd2);color:var(--acc);width:22px;height:22px;border-radius:2px;cursor:pointer;font-family:var(--mono);font-size:14px;">+</button>
+        </div>
+      </div>
+    </div>
+    <div id="preset-row-s1" class="preset-row" style="margin-bottom:10px;"></div>
+    <div id="s1rn" class="rnote"><span id="s1-pool-desc">7</span> 筆滾動：每天1筆，區間 = <span>當日價 × 倍率</span>，獲利即時複利</div>
+    <div class="cg2">
+      <div class="f"><label>結算天數</label><input type="number" id="s1-days" value="7" min="1" onchange="recalcAll()"></div>
+      <div class="f"><label id="s1-ep-label">當前ETH價格</label><input type="number" id="s1-ep" value="2042" step="1" onchange="recalcAll()"></div>
+    </div>
+    <div class="cg2">
+      <div class="f"><label>下限倍率</label><input type="number" id="s1-lr" value="1.15" step="0.01" onchange="syncP(1);recalcAll()"></div>
+      <div class="f"><label>上限倍率</label><input type="number" id="s1-ur" value="1.45" step="0.01" onchange="syncP(1);recalcAll()"></div>
+    </div>
+    <div class="cg2">
+      <div class="f"><label>下限價格</label><input type="number" id="s1-lo" value="2300" step="10" onchange="recalcAll()"></div>
+      <div class="f"><label>上限價格</label><input type="number" id="s1-hi" value="2900" step="10" onchange="recalcAll()"></div>
+      <div class="f"><label>保本年化 (%)</label><input type="number" id="s1-ba" value="0.05" step="0.01" onchange="recalcAll()"></div>
+      <div class="f"><label>最高年化 (%)</label><input type="number" id="s1-ma" value="31.30" step="0.1" onchange="recalcAll()"></div>
+    </div>
+    <div class="mc"><canvas id="mc1"></canvas></div>
+    <div class="rb" id="r1"></div>
+  </div>
+
+  <div class="sc bear">
+    <div class="chd">
+      <div class="cttl">
+        <span class="sdot" style="background:var(--bear);color:var(--bear)"></span>
+        <h3>策略二：趨勢智盈看跌</h3>
+        <span class="stag">BEAR</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="tog">
+          <button id="s2ms" class="on" onclick="setMode(2,'single')">SINGLE</button>
+          <button id="s2mr" onclick="setMode(2,'split')">ROLL</button>
+        </div>
+        <div id="s2-pool-ctrl" style="display:none;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--mut);">
+          水池數
+          <button onclick="adjPool(2,-1)" style="background:rgba(0,255,231,0.08);border:1px solid var(--brd2);color:var(--acc);width:22px;height:22px;border-radius:2px;cursor:pointer;font-family:var(--mono);font-size:14px;">−</button>
+          <span id="s2-pool-val" style="color:var(--acc);min-width:20px;text-align:center;">7</span>
+          <button onclick="adjPool(2,1)" style="background:rgba(0,255,231,0.08);border:1px solid var(--brd2);color:var(--acc);width:22px;height:22px;border-radius:2px;cursor:pointer;font-family:var(--mono);font-size:14px;">+</button>
+        </div>
+      </div>
+    </div>
+    <div id="preset-row-s2" class="preset-row" style="margin-bottom:10px;"></div>
+    <div id="s2rn" class="rnote"><span id="s2-pool-desc">7</span> 筆滾動：每天1筆，區間 = <span>當日價 × 倍率</span>，獲利即時複利</div>
+    <div class="cg2">
+      <div class="f"><label>結算天數</label><input type="number" id="s2-days" value="7" min="1" onchange="recalcAll()"></div>
+      <div class="f"><label id="s2-ep-label">當前ETH價格</label><input type="number" id="s2-ep" value="2042" step="1" onchange="recalcAll()"></div>
+    </div>
+    <div class="cg2">
+      <div class="f"><label>下限倍率</label><input type="number" id="s2-lr" value="0.55" step="0.01" onchange="syncP(2);recalcAll()"></div>
+      <div class="f"><label>上限倍率</label><input type="number" id="s2-ur" value="0.90" step="0.01" onchange="syncP(2);recalcAll()"></div>
+    </div>
+    <div class="cg2">
+      <div class="f"><label>下限價格</label><input type="number" id="s2-lo" value="1300" step="10" onchange="recalcAll()"></div>
+      <div class="f"><label>上限價格</label><input type="number" id="s2-hi" value="1800" step="10" onchange="recalcAll()"></div>
+      <div class="f"><label>保本年化 (%)</label><input type="number" id="s2-ba" value="0.05" step="0.01" onchange="recalcAll()"></div>
+      <div class="f"><label>最高年化 (%)</label><input type="number" id="s2-ma" value="31.30" step="0.1" onchange="recalcAll()"></div>
+    </div>
+    <div class="mc"><canvas id="mc2"></canvas></div>
+    <div class="rb" id="r2"></div>
+  </div>
+
+  <div class="sc range">
+    <div class="chd">
+      <div class="cttl">
+        <span class="sdot" style="background:var(--range);color:var(--range)"></span>
+        <h3>策略三：區間盈利</h3>
+        <span class="stag">RANGE</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="tog">
+          <button id="s3ms" class="on" onclick="setMode(3,'single')">SINGLE</button>
+          <button id="s3mr" onclick="setMode(3,'split')">ROLL</button>
+        </div>
+        <div id="s3-pool-ctrl" style="display:none;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--mut);">
+          水池數
+          <button onclick="adjPool(3,-1)" style="background:rgba(0,255,231,0.08);border:1px solid var(--brd2);color:var(--acc);width:22px;height:22px;border-radius:2px;cursor:pointer;font-family:var(--mono);font-size:14px;">−</button>
+          <span id="s3-pool-val" style="color:var(--acc);min-width:20px;text-align:center;">7</span>
+          <button onclick="adjPool(3,1)" style="background:rgba(0,255,231,0.08);border:1px solid var(--brd2);color:var(--acc);width:22px;height:22px;border-radius:2px;cursor:pointer;font-family:var(--mono);font-size:14px;">+</button>
+        </div>
+      </div>
+    </div>
+    <div id="preset-row-s3" class="preset-row" style="margin-bottom:10px;"></div>
+    <div id="s3rn" class="rnote"><span id="s3-pool-desc">7</span> 筆滾動：每天1筆，區間 = <span>當日價 × 倍率</span>，獲利即時複利</div>
+    <div class="cg2">
+      <div class="f"><label>結算天數</label><input type="number" id="s3-days" value="7" min="1" onchange="recalcAll()"></div>
+      <div class="f"><label id="s3-ep-label">當前ETH價格</label><input type="number" id="s3-ep" value="2042" step="1" onchange="recalcAll()"></div>
+    </div>
+    <div class="cg2">
+      <div class="f"><label>下限倍率</label><input type="number" id="s3-lr" value="1.0125" step="0.001" onchange="syncP(3);recalcAll()"></div>
+      <div class="f"><label>上限倍率</label><input type="number" id="s3-ur" value="1.0375" step="0.001" onchange="syncP(3);recalcAll()"></div>
+    </div>
+    <div class="cg2">
+      <div class="f"><label>區間下限</label><input type="number" id="s3-lo" value="2050" step="5" onchange="recalcAll()"></div>
+      <div class="f"><label>區間上限</label><input type="number" id="s3-hi" value="2075" step="5" onchange="recalcAll()"></div>
+      <div class="f"><label>區間內年化 (%)</label><input type="number" id="s3-ia" value="374.90" step="1" onchange="recalcAll()"></div>
+      <div class="f"><label>區間外年化 (%)</label><input type="number" id="s3-oa" value="0.05" step="0.01" onchange="recalcAll()"></div>
+    </div>
+    <div class="mc"><canvas id="mc3"></canvas></div>
+    <div class="rb" id="r3"></div>
+  </div>
+
+</div>
+
+<!-- Summary -->
+<div class="panel">
+  <div class="stitle">組合總覽</div>
+  <div class="sgd" id="sumG"></div>
+</div>
+
+<!-- Backtest -->
+<div class="panel">
+  <div class="stitle">歷史回測 — ETH 實際價格 + 複利再投</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+    <div>
+      <label style="font-family:var(--mono);font-size:12px;color:var(--mut);letter-spacing:2px;">SELECT PERIOD</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button class="pbtn on" onclick="selP('2y',this)">2024/01 – 2026/01 · 2YR</button>
+        <button class="pbtn" onclick="selP('1y',this)">2025/01 – 2026/01 · 1YR</button>
+      </div>
+    </div>
+    <button class="btn btnp" onclick="runBT()" style="align-self:flex-end;">▶ RUN BACKTEST</button>
+  </div>
+  <div style="font-family:var(--mono);font-size:13px;color:var(--mut);margin-bottom:14px;letter-spacing:1px;border-left:2px solid rgba(0,255,231,0.2);padding-left:10px;">
+    複利邏輯：每筆到期獲利即時滾入下一筆本金 · 7筆模式：pendingGain 精確累積 · S1/S2 觸發 = 到期日收盤價在區間內 · S3 觸發 = 持有期間所有 1h K線 High/Low 均在區間內 · 全部使用 1h K線資料回測
+  </div>
+  <div id="btA"><div style="font-family:var(--mono);color:var(--mut);font-size:16px;padding:20px 0;letter-spacing:2px;">◈ AWAITING EXECUTION</div></div>
+</div>
+
+<script>
+const modes={1:'single',2:'single',3:'single'};
+const pools={1:7,2:7,3:7};
+let ethPrice=2042;
+let currentSymbol='ETH';
+function unit(){return SYMBOL_CONFIG[currentSymbol].unit;} // 'ETH' or 'BTC'
+
+// Per-symbol preset configs
+const SYMBOL_CONFIG={
+  ETH:{
+    symbol:'ETHUSDT',label:'ETH / USDT',unit:'ETH',priceDecimals:2,
+    s1:{lr:1.15,ur:1.45,ba:0.05,ma:31.30},
+    s2:{lr:0.55,ur:0.90,ba:0.05,ma:31.30},
+    s3:{lr:1.0125,ur:1.0375,ia:389.51,oa:0.06},
+    defaultCapital:45
+  },
+  BTC:{
+    symbol:'BTCUSDT',label:'BTC / USDT',unit:'BTC',priceDecimals:0,
+    s1:{lr:1.15,ur:1.45,ba:0.05,ma:31.30},
+    s2:{lr:0.55,ur:0.90,ba:0.05,ma:31.30},
+    s3:{lr:1.0125,ur:1.0375,ia:389.51,oa:0.06},
+    defaultCapital:1
+  }
+};
+
+// Quick preset configs per symbol
+const QUICK_PRESETS={
+  ETH:{
+    s1:[
+      {days:7,  pools:7,  lr:1.09,ur:1.48,ba:0.15,ma:40.88,label:'7D'},
+      {days:30, pools:30, lr:1.09,ur:1.48,ba:0.15,ma:21.34,label:'30D'},
+      {days:60, pools:60, lr:1.09,ur:1.48,ba:0.15,ma:27.01,label:'60D'},
+    ],
+    s2:[
+      {days:7,  pools:7,  lr:0.56,ur:0.875,ba:0.05,ma:25.16,label:'7D'},
+      {days:30, pools:30, lr:0.56,ur:0.875,ba:0.05,ma:11.87,label:'30D'},
+      {days:60, pools:60, lr:0.61,ur:0.875,ba:0.05,ma:12.46,label:'60D'},
+    ],
+    s3:[] // no preset for S3
+  },
+  BTC:{
+    s1:[
+      {days:7, pools:7, lr:1.10,ur:1.38,ba:0.15,ma:15.78,label:'7D'},
+    ],
+    s2:[
+      {days:7, pools:7, lr:0.67,ur:0.89,ba:0.05,ma:3.28,label:'7D'},
+    ],
+    s3:[]
+  }
+};
+
+function g(id){return document.getElementById(id);}
+function gv(id){return parseFloat(g(id).value)||0;}
+
+function syncP(s){
+  const p=gv('s'+s+'-ep')||ethPrice;
+  const lr=gv('s'+s+'-lr'),ur=gv('s'+s+'-ur');
+  g('s'+s+'-lo').value=Math.round(p*lr);
+  g('s'+s+'-hi').value=Math.round(p*ur);
+}
+
+function switchSymbol(sym){
+  if(currentSymbol===sym) return;
+  currentSymbol=sym;
+  const cfg=SYMBOL_CONFIG[sym];
+
+  // Toggle BTC body theme
+  document.body.classList.toggle('btc-theme', sym==='BTC');
+
+  // Update header title
+  g('hdrSymbol').textContent=sym;
+
+  // Update switcher button styles dynamically
+  const isEth=sym==='ETH';
+  const ethAccent=isEth?'rgba(0,255,231,0.12)':'transparent';
+  const ethColor=isEth?'var(--acc)':'var(--mut)';
+  const ethBorder=isEth?'1px solid var(--acc)':'1px solid var(--brd2)';
+  const ethShadow=isEth?'0 0 12px rgba(0,255,231,0.2)':'none';
+  const btcAccent=!isEth?'rgba(247,147,26,0.15)':'transparent';
+  const btcColor=!isEth?'#f7931a':'var(--mut)';
+  const btcBorder=!isEth?'1px solid #f7931a':'1px solid var(--brd2)';
+  const btcShadow=!isEth?'0 0 12px rgba(247,147,26,0.25)':'none';
+  const eb=g('sym-btn-ETH'),bb=g('sym-btn-BTC');
+  if(eb){eb.style.background=ethAccent;eb.style.color=ethColor;eb.style.border=ethBorder;eb.style.boxShadow=ethShadow;}
+  if(bb){bb.style.background=btcAccent;bb.style.color=btcColor;bb.style.border=btcBorder;bb.style.boxShadow=btcShadow;}
+
+  // Update capital label unit
+  const cl=g('capitalLabel');if(cl)cl.textContent='初始資金 ('+cfg.unit+')';
+
+  // Apply preset ratios
+  g('s1-lr').value=cfg.s1.lr; g('s1-ur').value=cfg.s1.ur;
+  g('s1-ba').value=cfg.s1.ba; g('s1-ma').value=cfg.s1.ma;
+  g('s2-lr').value=cfg.s2.lr; g('s2-ur').value=cfg.s2.ur;
+  g('s2-ba').value=cfg.s2.ba; g('s2-ma').value=cfg.s2.ma;
+  g('s3-lr').value=cfg.s3.lr; g('s3-ur').value=cfg.s3.ur;
+  g('s3-ia').value=cfg.s3.ia; g('s3-oa').value=cfg.s3.oa;
+
+  // Update capital label & default
+  const capLabel=document.querySelector('label[for="totalEth"]');
+
+  // Reset backtest area
+  g('btA').innerHTML='<div style="font-family:var(--mono);color:var(--mut);font-size:13px;padding:20px 0;letter-spacing:2px;">◈ 已切換至 '+sym+'，請重新執行回測</div>';
+
+  // Update price field labels
+  [1,2,3].forEach(s=>{
+    const el=g('s'+s+'-ep-label');
+    if(el) el.textContent='當前'+sym+'價格';
+  });
+
+  // Refresh preset buttons for new symbol
+  refreshPresetBtns();
+
+  // Fetch new price (will syncP and recalcAll inside)
+  fetchEthPrice();
+}
+
+async function fetchEthPrice(){
+  try{
+    const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+SYMBOL_CONFIG[currentSymbol].symbol);
+    const d=await r.json();
+    ethPrice=parseFloat(d.price);
+    const dec=SYMBOL_CONFIG[currentSymbol].priceDecimals;
+    g('ethPriceDisplay').textContent='$'+ethPrice.toFixed(dec);
+    g('priceLabel')&&(g('priceLabel').textContent=SYMBOL_CONFIG[currentSymbol].label);
+    const n=new Date();
+    g('ethPriceTime').textContent='更新於 '+n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');
+    const dec2=SYMBOL_CONFIG[currentSymbol].priceDecimals;
+    [1,2,3].forEach(s=>{g('s'+s+'-ep').value=ethPrice.toFixed(dec2);syncP(s);});
+    g('simPrice')&&(g('simPrice').value=ethPrice.toFixed(2));
+    recalcAll();
+  }catch(e){g('ethPriceDisplay').textContent='$'+ethPrice.toFixed(2)+' (離線)';}
+}
+
+function setMode(s,m){
+  modes[s]=m;
+  g('s'+s+'ms').className=m==='single'?'on':'';
+  g('s'+s+'mr').className=m==='split'?'on':'';
+  const rn=g('s'+s+'rn');if(rn)rn.className='rnote'+(m==='split'?' show':'');
+  const pc=g('s'+s+'-pool-ctrl');if(pc)pc.style.display=m==='split'?'flex':'none';
+  recalcAll();
+}
+
+function adjPool(s,delta){
+  const newVal=Math.max(1,Math.min(30,pools[s]+delta));
+  pools[s]=newVal;
+  const el=g('s'+s+'-pool-val');if(el)el.textContent=newVal;
+  const desc=g('s'+s+'-pool-desc');if(desc)desc.textContent=newVal;
+  recalcAll();
+}
+
+function applyPreset(s, idx){
+  const sym=currentSymbol;
+  const presets=QUICK_PRESETS[sym]&&QUICK_PRESETS[sym]['s'+s];
+  if(!presets||!presets[idx])return;
+  const p=presets[idx];
+  // Set days
+  g('s'+s+'-days').value=p.days;
+  // Set pools & activate ROLL mode
+  pools[s]=p.pools;
+  const pv=g('s'+s+'-pool-val');if(pv)pv.textContent=p.pools;
+  const pd=g('s'+s+'-pool-desc');if(pd)pd.textContent=p.pools;
+  if(modes[s]!=='split') setMode(s,'split');
+  else{const pc=g('s'+s+'-pool-ctrl');if(pc)pc.style.display='flex';}
+  // Set ratios
+  g('s'+s+'-lr').value=p.lr; g('s'+s+'-ur').value=p.ur;
+  // Set APY
+  if(s<3){ g('s'+s+'-ba').value=p.ba; g('s'+s+'-ma').value=p.ma; }
+  // Sync prices
+  syncP(s);
+  // Highlight active preset button
+  const allBtns=document.querySelectorAll('.preset-btn-s'+s);
+  allBtns.forEach((b,i)=>{ b.classList.toggle('preset-active',i===idx); });
+  recalcAll();
+}
+
+function buildPresetBtns(s){
+  const sym=currentSymbol;
+  const presets=(QUICK_PRESETS[sym]&&QUICK_PRESETS[sym]['s'+s])||[];
+  if(!presets.length) return '';
+  const btns=presets.map((p,i)=>
+    `<button class="preset-btn preset-btn-s${s}" onclick="applyPreset(${s},${i})">${p.label}</button>`
+  ).join('');
+  return `<div class="preset-row" id="preset-row-s${s}"><span class="preset-label">快捷</span>${btns}</div>`;
+}
+
+function refreshPresetBtns(){
+  [1,2,3].forEach(s=>{
+    const row=g('preset-row-s'+s);
+    if(row){
+      const sym=currentSymbol;
+      const presets=(QUICK_PRESETS[sym]&&QUICK_PRESETS[sym]['s'+s])||[];
+      if(!presets.length){row.style.display='none';return;}
+      row.style.display='flex';
+      // rebuild buttons
+      const btns=presets.map((p,i)=>
+        `<button class="preset-btn preset-btn-s${i===0&&g('s'+s+'-days')&&parseInt(g('s'+s+'-days').value)===p.days?'active ':''} preset-btn-s${s}" onclick="applyPreset(${s},${i})">${p.label}</button>`
+      ).join('');
+      row.innerHTML=`<span class="preset-label">快捷</span>`+btns;
+    }
+  });
+}
+
+function autoBalance(ch){
+  const vals=[1,2,3].map(i=>gv('allocS'+i));
+  const tot=vals.reduce((a,b)=>a+b,0);
+  if(tot>100){
+    const ex=tot-100,others=[1,2,3].filter(i=>i!==ch);
+    const os=others.reduce((a,i)=>a+vals[i-1],0);
+    if(os>0)others.forEach(i=>{g('allocS'+i).value=Math.round(Math.max(0,vals[i-1]-(vals[i-1]/os*ex)));});
+  }
+  updAbar();recalcAll();
+}
+function updAbar(){
+  const b=g('abar');
+  b.children[0].style.width=gv('allocS1')+'%';
+  b.children[1].style.width=gv('allocS2')+'%';
+  b.children[2].style.width=gv('allocS3')+'%';
+}
+
+function calcAPY(s,ep,lo,hi){
+  const ba=s<3?gv('s'+s+'-ba'):gv('s'+s+'-oa');
+  const ma=s<3?gv('s'+s+'-ma'):gv('s'+s+'-ia');
+  if(s===1){if(ep>=hi)return ma;if(ep<=lo)return ba;return ba+((ep-lo)/(hi-lo))*(ma-ba);}
+  if(s===2){if(ep<=lo)return ma;if(ep>=hi)return ba;return ba+((hi-ep)/(hi-lo))*(ma-ba);}
+  return(ep>=lo&&ep<=hi)?ma:ba;
+}
+
+function calcSR(s,ep){
+  const total=gv('totalEth'),alloc=gv('allocS'+s)/100,ethAmt=total*alloc;
+  const days=gv('s'+s+'-days')||7,mode=modes[s];
+  if(mode==='single'){
+    const lo=gv('s'+s+'-lo'),hi=gv('s'+s+'-hi');
+    const apy=calcAPY(s,ep,lo,hi),ret=ethAmt*(apy/100)*(days/365);
+    return{ethAmt,ret,apy};
+  }else{
+    const nP=pools[s]||7;
+    const bE=ethAmt/nP,lr=gv('s'+s+'-lr'),ur=gv('s'+s+'-ur'),ep0=gv('s'+s+'-ep')||ethPrice;
+    let ret=0,apySum=0;
+    for(let i=0;i<nP;i++){const lo=ep0*lr,hi=ep0*ur,a=calcAPY(s,ep,lo,hi);ret+=bE*(a/100)*(days/365);apySum+=a;}
+    return{ethAmt,ret,apy:apySum/nP};
+  }
+}
+
+function drawMC(id,s){
+  const c=g(id);if(!c)return;
+  const ctx=c.getContext('2d');c.width=c.offsetWidth||300;c.height=66;ctx.clearRect(0,0,c.width,c.height);
+  const lo=gv('s'+s+'-lo'),hi=gv('s'+s+'-hi');
+  const ba=s<3?gv('s'+s+'-ba'):gv('s'+s+'-oa'),ma=s<3?gv('s'+s+'-ma'):gv('s'+s+'-ia');
+  const ml=7,mr=7,mt=5,mb=13,w=c.width-ml-mr,h=c.height-mt-mb;
+  const pMin=lo*0.72,pMax=hi*1.14;
+  const tX=p=>ml+((p-pMin)/(pMax-pMin))*w,tY=a=>mt+h-(a/(ma*1.1))*h;
+  const pts=[];
+  for(let i=0;i<=100;i++){
+    const p=pMin+(i/100)*(pMax-pMin);let a=0;
+    if(s===1){if(p<=lo||p>=hi)a=ba;else a=ba+((p-lo)/(hi-lo))*(ma-ba);}
+    else if(s===2){if(p>=hi||p<=lo)a=ba;else a=ba+((hi-p)/(hi-lo))*(ma-ba);}
+    else{a=(p>=lo&&p<=hi)?ma:ba;}
+    pts.push([tX(p),tY(a)]);
+  }
+  const fills={1:'rgba(0,255,136,0.12)',2:'rgba(255,45,85,0.12)',3:'rgba(255,184,0,0.12)'};
+  const lc={1:'#00ff88',2:'#ff2d55',3:'#ffb800'};
+  ctx.beginPath();ctx.moveTo(pts[0][0],mt+h);pts.forEach(([x,y])=>ctx.lineTo(x,y));ctx.lineTo(pts[99][0],mt+h);ctx.closePath();ctx.fillStyle=fills[s];ctx.fill();
+  ctx.beginPath();pts.forEach(([x,y],i)=>i===0?ctx.moveTo(x,y):ctx.lineTo(x,y));ctx.strokeStyle=lc[s];ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='#3a5a80';ctx.font='10px Share Tech Mono,monospace';ctx.textAlign='center';
+  ctx.fillText(lo.toLocaleString(),tX(lo),c.height-2);ctx.fillText(hi.toLocaleString(),tX(hi),c.height-2);
+}
+
+function getResHTML(s,ep){
+  const d=calcSR(s,ep);const col=s===1?'bull':s===2?'bear':'rng';
+  const mode=modes[s],days=gv('s'+s+'-days')||7;
+  const nP=pools[s]||7;
+  const u=unit();
+  const bDesc=mode==='split'?`(${nP}筆 × ${(d.ethAmt/nP).toFixed(4)} · 每日複利滾動)`:'';
+  return`<div class="rr"><span class="rl">投入金額</span><span class="rv">${d.ethAmt.toFixed(4)} ${u} ${bDesc}</span></div>
+<div class="rr"><span class="rl">預期回報 (${days}天)</span><span class="rv ${col}">+${d.ret.toFixed(6)} ${u}</span></div>
+<div class="rr"><span class="rl">年化率</span><span class="rv acc">${d.apy.toFixed(2)}%</span></div>
+<div class="rr"><span class="rl">到期持有</span><span class="rv">${(d.ethAmt+d.ret).toFixed(6)} ${u}</span></div>`;
+}
+
+function recalcAll(){
+  updAbar();
+  for(let s=1;s<=3;s++){g('r'+s).innerHTML=getResHTML(s,ethPrice);drawMC('mc'+s,s);}
+  updSum();
+}
+
+function updSum(){
+  const tot=gv('totalEth');let tr=0;
+  for(let s=1;s<=3;s++)tr+=calcSR(s,ethPrice).ret;
+  const ps=[];for(let i=0;i<=250;i++)ps.push(500+i*18);
+  let best=-Infinity,worst=Infinity;
+  ps.forEach(p=>{let r=0;for(let s=1;s<=3;s++)r+=calcSR(s,p).ret;if(r>best)best=r;if(r<worst)worst=r;});
+  const days=gv('s1-days')||7,apy=tr/tot*365/days*100;
+  const u2=unit();
+  g('sumG').innerHTML=`
+<div class="si"><div class="sl">總投入</div><div class="sv" style="color:var(--acc)">${tot} ${u2}</div></div>
+<div class="si"><div class="sl">當前預期回報</div><div class="sv positive">+${tr.toFixed(6)}</div><div class="ss">${u2}</div></div>
+<div class="si"><div class="sl">組合年化</div><div class="sv" style="color:var(--acc)">${apy.toFixed(2)}%</div></div>
+<div class="si"><div class="sl">最佳情境</div><div class="sv positive">+${best.toFixed(5)}</div><div class="ss">${u2}</div></div>
+<div class="si"><div class="sl">最差情境</div><div class="sv" style="color:var(--range)">+${worst.toFixed(5)}</div><div class="ss">${u2} (保本)</div></div>
+<div class="si"><div class="sl">到期持有</div><div class="sv">${(tot+tr).toFixed(4)}</div><div class="ss">${u2}</div></div>`;
+}
+
+// ─── BACKTEST ─────────────────────────────────
+let btPeriod='2y';
+function selP(p,el){btPeriod=p;document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+
+async function fetchKL(s0,e0){
+  const all=[];let cur=s0;
+  while(cur<e0){
+    const url='https://api.binance.com/api/v3/klines?symbol='+SYMBOL_CONFIG[currentSymbol].symbol+'&interval=1d&startTime='+cur+'&endTime='+e0+'&limit=500';
+    try{const r=await fetch(url),d=await r.json();if(!d||!d.length)break;
+      d.forEach(k=>{all.push({date:new Date(k[0]),open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4])});});
+      if(d.length<500)break;cur=d[d.length-1][0]+86400000;
+    }catch(e){break;}
+  }
+  return all;
+}
+
+// Fetch 1h klines for S3 precision — store as {ts, high, low}
+async function fetchKL1h(s0,e0,progressCb){
+  const all=[];let cur=s0;
+  const HOUR=3600000;
+  while(cur<e0){
+    const url='https://api.binance.com/api/v3/klines?symbol='+SYMBOL_CONFIG[currentSymbol].symbol+'&interval=1h&startTime='+cur+'&endTime='+e0+'&limit=500';
+    try{
+      const r=await fetch(url),d=await r.json();
+      if(!d||!d.length)break;
+      d.forEach(k=>{all.push({ts:k[0],high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4])});});
+      if(progressCb) progressCb(all.length);
+      if(d.length<500)break;
+      cur=d[d.length-1][0]+HOUR;
+    }catch(e){break;}
+    // small yield to not block UI
+    await new Promise(res=>setTimeout(res,0));
+  }
+  return all;
+}
+
+// Check if S3 stays in range for entire period using 1h candles
+// Returns true if ALL 1h candles in [startMs, endMs] have low>=lo AND high<=hi
+function s3InRange(klines1h, startMs, endMs, lo, hi){
+  // binary search for start index
+  let left=0,right=klines1h.length-1,startIdx=klines1h.length;
+  while(left<=right){const m=(left+right)>>1;if(klines1h[m].ts>=startMs){startIdx=m;right=m-1;}else left=m+1;}
+  for(let i=startIdx;i<klines1h.length;i++){
+    const k=klines1h[i];
+    if(k.ts>endMs)break;
+    if(k.low<lo||k.high>hi)return false;
+  }
+  return true;
+}
+
+function apyVal(s,ep,lo,hi){
+  const ba=s<3?gv('s'+s+'-ba'):gv('s'+s+'-oa'),ma=s<3?gv('s'+s+'-ma'):gv('s'+s+'-ia');
+  if(s===1){if(ep<=lo||ep>=hi)return{apy:ba,zone:'base'};return{apy:ba+((ep-lo)/(hi-lo))*(ma-ba),zone:'in'};}
+  if(s===2){if(ep>=hi||ep<=lo)return{apy:ba,zone:'base'};return{apy:ba+((hi-ep)/(hi-lo))*(ma-ba),zone:'in'};}
+  return ep>=lo&&ep<=hi?{apy:ma,zone:'in'}:{apy:ba,zone:'out'};
+}
+
+async function runBT(){
+  const area=g('btA');
+  const e0ms=new Date('2026-01-01T00:00:00Z').getTime();
+  const s0=btPeriod==='2y'?new Date('2024-01-01T00:00:00Z'):new Date('2025-01-01T00:00:00Z');
+  const s0ms=s0.getTime();
+
+  area.innerHTML='<div class="bt-load"><div class="spin"></div><br>抓取 1h K線資料... <span id="h1prog">0</span> 根</div>';
+  const klines1h=await fetchKL1h(s0ms,e0ms,(n)=>{const el=document.getElementById('h1prog');if(el)el.textContent=n;});
+  if(klines1h.length<24){area.innerHTML='<div style="color:var(--bear);padding:20px;">無法連線 Binance API，請檢查網路。</div>';return;}
+
+  // Build daily klines from 1h data (use last candle of each day as close)
+  const klinesMap={};
+  klines1h.forEach(k=>{
+    const d=new Date(k.ts);
+    const dk=d.toISOString().slice(0,10);
+    if(!klinesMap[dk]) klinesMap[dk]={date:new Date(dk+'T00:00:00Z'),high:k.high,low:k.low,close:k.close||k.high};
+    else{
+      klinesMap[dk].high=Math.max(klinesMap[dk].high,k.high);
+      klinesMap[dk].low=Math.min(klinesMap[dk].low,k.low);
+      klinesMap[dk].close=k.close||k.high;
+    }
+  });
+  const klines=Object.values(klinesMap).sort((a,b)=>a.date-b.date);
+  area.innerHTML='<div class="bt-load"><div class="spin"></div><br>計算回測中...</div>';
+
+  const totalEth=gv('totalEth');
+  const allResults=[];
+
+  for(let s=1;s<=3;s++){
+    const alloc=gv('allocS'+s)/100,days=Math.max(1,Math.round(gv('s'+s+'-days'))||7);
+    const mode=modes[s],lr=gv('s'+s+'-lr'),ur=gv('s'+s+'-ur');
+    const fixLo=gv('s'+s+'-lo'),fixHi=gv('s'+s+'-hi');
+    let ethAmt=totalEth*alloc; // starts here, grows with compounding
+    const logs=[];
+
+    // Trigger counters
+    let cntIn=0,cntBase=0,cntAbove=0,cntBelow=0;
+
+    if(mode==='single'){
+      let pool=ethAmt,i=0;
+      while(i+days-1<klines.length){
+        const sk=klines[i],ek=klines[Math.min(i+days-1,klines.length-1)];
+        const ep=ek.close;
+        let avResult;
+        if(s===3){
+          // S3: check entire holding period using 1h candles
+          const inR=s3InRange(klines1h,sk.date.getTime(),ek.date.getTime()+86399999,fixLo,fixHi);
+          const ba3=gv('s3-oa'),ma3=gv('s3-ia');
+          avResult={apy:inR?ma3:ba3,zone:inR?'in':'out'};
+        }else{
+          avResult=apyVal(s,ep,fixLo,fixHi);
+        }
+        const{apy,zone}=avResult;
+        const ret=pool*(apy/100)*(days/365);
+        pool+=ret;
+        if(zone==='in')cntIn++;else{cntBase++;if(s===1&&ep>fixHi)cntAbove++;if(s===1&&ep<fixLo)cntBelow++;if(s===2&&ep>fixHi)cntAbove++;if(s===2&&ep<fixLo)cntBelow++;}
+        logs.push({date:sk.date.toISOString().slice(0,10),expDate:ek.date.toISOString().slice(0,10),sp:sk.close,ep,lo:fixLo,hi:fixHi,apy,ret,batchAmt:null,pool,zone,s});
+        i+=days;
+      }
+      allResults.push({s,mode,logs,initEth:ethAmt,finalEth:logs.length?logs[logs.length-1].pool:ethAmt,cntIn,cntBase,cntAbove,cntBelow,totalCycles:logs.length});
+    }else{
+      // 7-batch rolling with compounding
+      // Track a running "pool" that grows each time a batch expires
+      // On day i: launch batch i. It expires on day i+days-1.
+      // Each batch uses 1/7 of current pool at launch time.
+      // When batch expires, gain = batchAmt*(apy/100)*(days/365), add to pool.
+      const N=klines.length;
+      const pool=[totalEth*alloc]; // pool[day] after day's settlements
+      for(let d2=1;d2<N;d2++)pool.push(pool[d2-1]);
+
+      // First pass: for each batch launched on day i, record expiry gain on day i+days-1
+      const dayGain=new Array(N).fill(0);
+      const batchLogs=[];
+      // We need pool size at launch time; but pool depends on previous gains.
+      // We approximate: batch amount = pool[i]/7 at launch day i.
+      // Recompute iteratively:
+      const poolArr=new Array(N).fill(0);
+      poolArr[0]=totalEth*alloc;
+
+      // Two-pass: first compute gains, then accumulate pool
+      // Actually do it day by day:
+      // Each day, settle batches expiring today, then update pool
+      const batchAmtAtLaunch=new Array(N).fill(0);
+      const batchExpGain=new Array(N).fill(0);
+      const batchZone=new Array(N).fill('base');
+      const batchAPY=new Array(N).fill(0);
+      const batchLo=new Array(N).fill(0);
+      const batchHi=new Array(N).fill(0);
+
+      // Day-by-day simulation — 正確複利邏輯
+      // 每天同時有最多 days 筆在跑，每筆本金 = 啟動當日 pool/nPools
+      // 到期那天把獲利滾回 pool，次日起的新筆本金自動變大
+      // pendingGain 要夠大，容納 N+days 天
+      const nPools = pools[s]||7;
+      const pendingGain = new Array(N + days + 1).fill(0);
+      const poolByDay = new Array(N).fill(0);
+      let runPool = totalEth * alloc;
+
+      for(let d2=0;d2<N;d2++){
+        // Step 1: 今天到期批次獲利滾入 pool
+        runPool += pendingGain[d2];
+        poolByDay[d2] = runPool;
+
+        // Step 2: 今天啟動新批次，本金 = 當前 pool / 7
+        const bAmt = runPool / nPools;
+        batchAmtAtLaunch[d2] = bAmt;
+        const entryP = klines[d2].close;
+        batchLo[d2] = entryP * lr;
+        batchHi[d2] = entryP * ur;
+        const expIdx = Math.min(d2 + days - 1, N - 1);
+        const ep = klines[expIdx].close;
+        let avR2;
+        if(s===3){
+          const startMs3=klines[d2].date.getTime();
+          const endMs3=klines[expIdx].date.getTime()+86399999;
+          const inR3=s3InRange(klines1h,startMs3,endMs3,batchLo[d2],batchHi[d2]);
+          const ba3=gv('s3-oa'),ma3=gv('s3-ia');
+          avR2={apy:inR3?ma3:ba3,zone:inR3?'in':'out'};
+        }else{
+          avR2=apyVal(s,ep,batchLo[d2],batchHi[d2]);
+        }
+        const{apy, zone}=avR2;
+        const gain = bAmt * (apy / 100) * (days / 365);
+        pendingGain[expIdx] += gain;
+        batchZone[d2] = zone;
+        batchAPY[d2] = apy;
+
+        if(zone==='in') cntIn++;
+        else {
+          cntBase++;
+          if(s===1 && ep > batchHi[d2]) cntAbove++;
+          if(s===1 && ep < batchLo[d2]) cntBelow++;
+          if(s===2 && ep > batchHi[d2]) cntAbove++;
+          if(s===2 && ep < batchLo[d2]) cntBelow++;
+        }
+      }
+      // 最終：把 poolByDay 最後一天之後還未被 d2 迴圈處理到的收益加入
+      // (d2 迴圈結束時 d2=N，還差 pendingGain[N..N+days-1])
+      let finalPool = poolByDay[N-1];
+      for(let d2=N; d2<N+days; d2++) finalPool += pendingGain[d2];
+
+      // Build logs（每筆顯示：批次本金、個別獲利、到期當日累計pool）
+      for(let d2=0;d2<N;d2++){
+        const expIdx = Math.min(d2 + days - 1, N - 1);
+        const bRet = batchAmtAtLaunch[d2] * (batchAPY[d2] / 100) * (days / 365);
+        logs.push({
+          date: klines[d2].date.toISOString().slice(0,10),
+          expDate: klines[expIdx].date.toISOString().slice(0,10),
+          sp: klines[d2].close,
+          ep: klines[expIdx].close,
+          lo: Math.round(batchLo[d2]),
+          hi: Math.round(batchHi[d2]),
+          apy: batchAPY[d2],
+          batchAmt: batchAmtAtLaunch[d2],
+          ret: bRet,
+          pool: poolByDay[expIdx], // pool 在到期當天的值（含今日結算）
+          zone: batchZone[d2], s
+        });
+      }
+      allResults.push({s,mode,logs,initEth:totalEth*alloc,finalEth:finalPool,cntIn,cntBase,cntAbove,cntBelow,totalCycles:N,poolByDay,klines});
+    }
+  }
+
+  window._btK=klines;window._btK1h=klines1h;window._btR=allResults;
+  const totalGain=allResults.reduce((a,r)=>a+r.finalEth-r.initEth,0);
+  area.innerHTML=buildBtHTML(allResults,klines,totalEth,totalGain);
+  setTimeout(()=>drawBtP('bpC',klines,allResults),80);
+}
+
+function buildBtHTML(res,klines,totalEth,totalGain){
+  const cF=totalEth+totalGain,pct=(totalGain/totalEth*100);
+  const sn=['\u9be2\u9b5a\u9170\u770b\u6f32','\u9be2\u9b5a\u9170\u770b\u8dcc','\u5340\u9593\u76c8\u5229'],sc=['var(--bull)','var(--bear)','var(--range)'];
+  const u3=unit();
+  let h='<div class="bsm">';
+  h+=`<div class="bst"><div class="bl">總回測天數</div><div class="bv" style="color:var(--acc)">${klines.length} 天</div></div>`;
+  h+=`<div class="bst"><div class="bl">初始資金</div><div class="bv">${totalEth} ${u3}</div></div>`;
+  h+=`<div class="bst"><div class="bl">組合最終</div><div class="bv positive">${cF.toFixed(4)} ${u3}</div></div>`;
+  h+=`<div class="bst"><div class="bl">累積獲利</div><div class="bv positive">+${totalGain.toFixed(5)} ${u3}</div></div>`;
+  h+=`<div class="bst"><div class="bl">累積回報率</div><div class="bv positive">+${pct.toFixed(3)}%</div></div>`;
+  res.forEach((r,i)=>{h+=`<div class="bst"><div class="bl" style="color:${sc[i]}">${sn[i]}</div><div class="bv" style="color:${sc[i]}">+${(r.finalEth-r.initEth).toFixed(5)}</div><div class="bs">${r.mode==='split'?'7筆滾動':'單筆'} · ${r.finalEth.toFixed(4)} ${u3}</div></div>`;});
+  h+='</div>';
+
+  // Trigger stats
+  h+='<div class="tstat-grid">';
+  const snames=['\u7b56\u7565\u4e00\uff1a\u9be2\u9b5a\u9170\u770b\u6f32','\u7b56\u7565\u4e8c\uff1a\u9be2\u9b5a\u9170\u770b\u8dcc','\u7b56\u7565\u4e09\uff1a\u5340\u9593\u76c8\u5229'];
+  const scs=['#22c55e','#ef4444','#f59e0b'];
+  res.forEach((r,i)=>{
+    const tot=r.totalCycles;
+    const inPct=tot>0?Math.round(r.cntIn/tot*100):0;
+    const basePct=tot>0?Math.round(r.cntBase/tot*100):0;
+    h+=`<div class="tstat"><div class="ts-title" style="color:${scs[i]}">${snames[i]}</div>`;
+    if(i<2){// Shark fin
+      h+=`<div class="ts-row"><span>✅ 觸發高APY（在區間）</span><span class="positive">${r.cntIn} 次 (${inPct}%)</span></div>`;
+      h+=`<div class="ts-bar-wrap"><div class="ts-bar" style="width:${inPct}%;background:${scs[i]};opacity:0.7;"></div></div>`;
+      if(i===0){h+=`<div class="ts-row" style="margin-top:5px"><span>⬆ 超上限保本（EP > 上限）</span><span class="neutral">${r.cntAbove} 次</span></div><div class="ts-row"><span>⬇ 低於下限保本（EP &lt; 下限）</span><span class="neutral">${r.cntBase-r.cntAbove} 次</span></div>`;}
+      if(i===1){h+=`<div class="ts-row" style="margin-top:5px"><span>⬆ 高於上限保本（EP > 上限）</span><span class="neutral">${r.cntAbove} 次</span></div><div class="ts-row"><span>⬇ 低於下限保本（EP &lt; 下限）</span><span class="neutral">${r.cntBelow} 次</span></div>`;}
+      h+=`<div class="ts-row"><span>⚪ 保本（區間外）</span><span class="neutral">${r.cntBase} 次 (${basePct}%)</span></div>`;
+    }else{// Range
+      h+=`<div class="ts-row"><span>✅ 在區間（高APY）</span><span style="color:var(--range)">${r.cntIn} 次 (${inPct}%)</span></div>`;
+      h+=`<div class="ts-bar-wrap"><div class="ts-bar" style="width:${inPct}%;background:${scs[i]};opacity:0.7;"></div></div>`;
+      h+=`<div class="ts-row" style="margin-top:5px"><span>⚪ 區間外（低APY）</span><span class="neutral">${r.cntBase} 次 (${basePct}%)</span></div>`;
+    }
+    h+=`<div class="ts-row" style="margin-top:7px;border-top:1px solid var(--brd);padding-top:6px;"><span>總筆數</span><span class="neutral">${tot} 筆</span></div>`;
+    h+='</div>';
+  });
+  h+='</div>';
+
+  // Charts + logs
+  h+='<div class="btabs"><button class="btab on" onclick="btTab(\'p\',this)">ETH 價格走勢</button><button class="btab" onclick="btTab(\'c\',this)">累積收益曲線</button><button class="btab" onclick="btTab(\'l1\',this)">S1 日誌</button><button class="btab" onclick="btTab(\'l2\',this)">S2 日誌</button><button class="btab" onclick="btTab(\'l3\',this)">S3 日誌</button></div>';
+  h+='<div id="btp-p"><div class="bcbox"><canvas id="bpC"></canvas></div></div>';
+  h+='<div id="btp-c" style="display:none"><div class="bcbox"><canvas id="bcC"></canvas></div></div>';
+  for(let s=1;s<=3;s++){
+    h+=`<div id="btp-l${s}" style="display:none">${buildLog(res[s-1])}</div>`;
+  }
+  return h;
+}
+
+function buildLog(r){
+  const isSplit = r.mode==='split';
+  const sColor = r.s===1?'var(--bull)':r.s===2?'var(--bear)':'var(--range)';
+  const totalGain = r.finalEth - r.initEth;
+  const cntIn = r.cntIn, totCycles = r.totalCycles;
+  const inPct = totCycles>0 ? (cntIn/totCycles*100).toFixed(1) : '0.0';
+
+  // Summary bar
+  let h = `<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;gap:20px;flex-wrap:wrap;font-size:16px;">`;
+  h += `<span style="color:var(--mut)">總筆數 <span style="color:var(--txt);font-family:'Space Mono',monospace">${r.logs.length}</span></span>`;
+  const u4=unit();
+  h += `<span style="color:var(--mut)">初始 <span style="color:var(--txt);font-family:'Space Mono',monospace">${r.initEth.toFixed(4)}</span> ${u4}</span>`;
+  h += `<span style="color:var(--mut)">最終 <span style="color:${sColor};font-family:'Space Mono',monospace">${r.finalEth.toFixed(4)}</span> ${u4}</span>`;
+  h += `<span style="color:var(--mut)">累積獲利 <span class="positive" style="font-family:'Space Mono',monospace">+${totalGain.toFixed(5)}</span> ${u4}</span>`;
+  h += `<span style="color:var(--mut)">觸發率 <span style="color:${sColor};font-family:'Space Mono',monospace">${inPct}%</span> (${cntIn}/${totCycles})</span>`;
+  if(isSplit) h += `<span style="color:var(--acc);font-size:14px;">7筆滾動 · 批次本金 = 當日pool÷7 · 複利</span>`;
+  h += `</div>`;
+
+  // Table
+  h += `<div class="logtw"><table class="logt"><thead><tr>`;
+  h += `<th>#</th><th>進場日</th><th>到期日</th><th>進場價</th><th>到期價</th><th>下限</th><th>上限</th>`;
+  if(isSplit) h += `<th>批次本金</th>`;
+  h += `<th>年化%</th><th>本期獲利</th><th>策略累計</th><th>狀態</th>`;
+  h += `</tr></thead><tbody>`;
+
+  r.logs.forEach((c,i)=>{
+    let tag = '';
+    if(c.zone==='in'){
+      tag = `<span class="tag-tri">✅ 觸發高APY</span>`;
+    } else {
+      if(r.s===1 && c.ep >= c.hi)      tag = `<span class="tag-hi">⬆ 超上限保本</span>`;
+      else if(r.s===1 && c.ep <= c.lo) tag = `<span class="tag-base">⬇ 低於下限保本</span>`;
+      else if(r.s===2 && c.ep <= c.lo) tag = `<span class="tag-hi">⬇ 超下限保本</span>`;
+      else if(r.s===2 && c.ep >= c.hi) tag = `<span class="tag-base">⬆ 高於上限保本</span>`;
+      else                               tag = `<span class="tag-base">⚪ 保本</span>`;
+    }
+    h += `<tr>`;
+    h += `<td class="neutral">${i+1}</td>`;
+    h += `<td>${c.date}</td><td>${c.expDate}</td>`;
+    h += `<td>$${c.sp.toFixed(0)}</td><td>$${c.ep.toFixed(0)}</td>`;
+    h += `<td>$${c.lo}</td><td>$${c.hi}</td>`;
+    if(isSplit) h += `<td class="neutral">${c.batchAmt ? c.batchAmt.toFixed(5) : '-'}</td>`;
+    h += `<td class="${c.zone==='in'?'positive':'neutral'}">${c.apy.toFixed(2)}%</td>`;
+    h += `<td class="positive">+${c.ret.toFixed(6)}</td>`;
+    h += `<td>${c.pool.toFixed(5)}</td>`;
+    h += `<td>${tag}</td>`;
+    h += `</tr>`;
+  });
+  return h + '</tbody></table></div>';
+}
+
+function btTab(name,el){
+  document.querySelectorAll('[id^="btp-"]').forEach(e=>e.style.display='none');
+  const t=document.getElementById('btp-'+name);if(t)t.style.display='';
+  document.querySelectorAll('.btab').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+  const te=gv('totalEth');
+  if(name==='p')setTimeout(()=>drawBtP('bpC',window._btK,window._btR),60);
+  if(name==='c')setTimeout(()=>drawBtC('bcC',window._btR,te),60);
+}
+
+function initC(id){
+  const c=document.getElementById(id);if(!c)return null;
+  const box=c.parentElement,dpr=window.devicePixelRatio||1;
+  const W=box.clientWidth-18,H=box.clientHeight-18;
+  c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px';
+  const ctx=c.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  return{ctx,W,H};
+}
+
+function drawBtP(id,klines,res){
+  const c=initC(id);if(!c)return;const{ctx,W,H}=c;
+  const ml=60,mr=16,mt=16,mb=30,w=W-ml-mr,h=H-mt-mb;
+  const ps=klines.map(k=>k.close),minP=Math.min(...ps)*0.97,maxP=Math.max(...ps)*1.02;
+  const tX=i=>ml+(i/(klines.length-1))*w,tY=p=>mt+h-((p-minP)/(maxP-minP))*h;
+  for(let g2=0;g2<=4;g2++){const gy=mt+(g2/4)*h,gv2=maxP-(g2/4)*(maxP-minP);ctx.strokeStyle='rgba(14,32,64,0.8)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ml,gy);ctx.lineTo(ml+w,gy);ctx.stroke();ctx.fillStyle='#3a5a80';ctx.font='11px Share Tech Mono,monospace';ctx.textAlign='right';ctx.fillText('$'+Math.round(gv2).toLocaleString(),ml-5,gy+4);}
+  const bands=[{s:1,bg:'rgba(0,255,136,0.06)',ln:'rgba(0,255,136,0.35)'},{s:2,bg:'rgba(255,45,85,0.06)',ln:'rgba(255,45,85,0.35)'},{s:3,bg:'rgba(255,184,0,0.08)',ln:'rgba(255,184,0,0.45)'}];
+  bands.forEach(b=>{const lo=gv('s'+b.s+'-lo'),hi=gv('s'+b.s+'-hi');if(hi<minP||lo>maxP)return;const y1=tY(Math.min(hi,maxP)),y2=tY(Math.max(lo,minP));ctx.fillStyle=b.bg;ctx.fillRect(ml,Math.max(mt,y1),w,Math.min(mt+h,y2)-Math.max(mt,y1));ctx.strokeStyle=b.ln;ctx.lineWidth=1;ctx.setLineDash([5,4]);if(lo>=minP&&lo<=maxP){ctx.beginPath();ctx.moveTo(ml,tY(lo));ctx.lineTo(ml+w,tY(lo));ctx.stroke();}if(hi>=minP&&hi<=maxP){ctx.beginPath();ctx.moveTo(ml,tY(hi));ctx.lineTo(ml+w,tY(hi));ctx.stroke();}ctx.setLineDash([]);});
+  const gr=ctx.createLinearGradient(0,mt,0,mt+h);gr.addColorStop(0,'rgba(0,255,231,0.15)');gr.addColorStop(1,'rgba(0,255,231,0)');ctx.beginPath();ctx.moveTo(tX(0),mt+h);klines.forEach((k,i)=>ctx.lineTo(tX(i),tY(k.close)));ctx.lineTo(tX(klines.length-1),mt+h);ctx.closePath();ctx.fillStyle=gr;ctx.fill();
+  ctx.beginPath();klines.forEach((k,i)=>i===0?ctx.moveTo(tX(i),tY(k.close)):ctx.lineTo(tX(i),tY(k.close)));ctx.strokeStyle='#00ffe7';ctx.lineWidth=1.8;ctx.stroke();
+  ctx.fillStyle='#3a5a80';ctx.font='10px Share Tech Mono,monospace';ctx.textAlign='center';
+  for(let l=0;l<=5;l++){const li=Math.round(l/5*(klines.length-1));ctx.fillText(klines[li].date.toISOString().slice(0,10),tX(li),H-4);}
+}
+
+function drawBtC(id,res,totalEth){
+  const c=initC(id);if(!c)return;const{ctx,W,H}=c;
+  const ml=70,mr=16,mt=16,mb=38,w=W-ml-mr,h=H-mt-mb;
+  const sc=['#00ff88','#ff2d55','#ffb800'],sn=['S1','S2','S3'];
+  const N=window._btK?window._btK.length:0;if(!N)return;
+  // Build day-indexed series for each strategy
+  const series=res.map(r=>{
+    if(r.mode==='split'&&r.poolByDay)return r.poolByDay;
+    const arr=new Array(N).fill(null);
+    r.logs.forEach(lg=>{const idx=window._btK.findIndex(k=>k.date.toISOString().slice(0,10)===lg.expDate);if(idx>=0)arr[idx]=lg.pool;});
+    let last=r.initEth;return arr.map(v=>{if(v!==null)last=v;return last;});
+  });
+  const combined=new Array(N).fill(0).map((_,i)=>series.reduce((s2,d)=>s2+(d[i]||0),0));
+  const flat=[...combined,...series.flat()].filter(v=>v>0);
+  const minV=Math.min(...flat)*0.9995,maxV=Math.max(...flat)*1.0005;
+  const tX=i=>ml+(i/(N-1))*w,tY=v=>mt+h-((v-minV)/(maxV-minV))*h;
+  for(let g2=0;g2<=4;g2++){const gy=mt+(g2/4)*h,gv2=maxV-(g2/4)*(maxV-minV);ctx.strokeStyle='rgba(14,32,64,0.8)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ml,gy);ctx.lineTo(ml+w,gy);ctx.stroke();ctx.fillStyle='#3a5a80';ctx.font='11px Share Tech Mono,monospace';ctx.textAlign='right';ctx.fillText(gv2.toFixed(3),ml-5,gy+4);}
+  ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(ml,tY(totalEth));ctx.lineTo(ml+w,tY(totalEth));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(0,255,231,0.3)';ctx.font='10px Space Mono,monospace';ctx.textAlign='left';ctx.fillText('初始 '+totalEth+' '+unit(),ml+4,tY(totalEth)-4);
+  series.forEach((d,si)=>{ctx.globalAlpha=0.5;ctx.beginPath();d.forEach((v,i)=>i===0?ctx.moveTo(tX(i),tY(v)):ctx.lineTo(tX(i),tY(v)));ctx.strokeStyle=sc[si];ctx.lineWidth=1.5;ctx.stroke();ctx.globalAlpha=1;});
+  const gr=ctx.createLinearGradient(0,mt,0,mt+h);gr.addColorStop(0,'rgba(0,255,231,0.18)');gr.addColorStop(1,'rgba(0,255,231,0)');ctx.beginPath();ctx.moveTo(tX(0),mt+h);combined.forEach((v,i)=>ctx.lineTo(tX(i),tY(v)));ctx.lineTo(tX(N-1),mt+h);ctx.closePath();ctx.fillStyle=gr;ctx.fill();
+  ctx.beginPath();combined.forEach((v,i)=>i===0?ctx.moveTo(tX(i),tY(v)):ctx.lineTo(tX(i),tY(v)));ctx.strokeStyle='#00ffe7';ctx.lineWidth=2.5;ctx.stroke();
+  const leg=[...sn.map((n,i)=>({l:n,c:sc[i]})),{l:'組合',c:'#00d4ff'}];let lx=ml;
+  leg.forEach(e=>{ctx.fillStyle=e.c;ctx.fillRect(lx,H-mb+7,9,9);ctx.fillStyle='#4a7aa0';ctx.font='11px monospace';ctx.textAlign='left';ctx.fillText(e.l,lx+12,H-mb+16);lx+=60;});
+  ctx.fillStyle='#3a5a80';ctx.font='10px Share Tech Mono,monospace';ctx.textAlign='center';
+  const K=window._btK;for(let l=0;l<=5;l++){const li=Math.round(l/5*(N-1));ctx.fillText(K[li].date.toISOString().slice(0,10),tX(li),H-4);}
+}
+
+// Init
+window.addEventListener('load',()=>{
+  refreshPresetBtns();
+  [1,2,3].forEach(s=>syncP(s));
+  fetchEthPrice().catch(()=>{recalcAll();});
+  setTimeout(()=>{recalcAll();refreshPresetBtns();},1500);
+});
+setInterval(()=>fetchEthPrice().catch(()=>{}),30000);
+</script>
+</body>
+</html>
