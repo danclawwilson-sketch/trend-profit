@@ -1041,8 +1041,8 @@ function s3InRange(klines1m, startMs, endMs, lo, hi){
 
 function apyVal(s,ep,lo,hi){
   const ba=s<3?gv('s'+s+'-ba'):gv('s'+s+'-oa'),ma=s<3?gv('s'+s+'-ma'):gv('s'+s+'-ia');
-  if(s===1){if(ep<=lo||ep>=hi)return{apy:ba,zone:'base'};return{apy:ba+((ep-lo)/(hi-lo))*(ma-ba),zone:'in'};}
-  if(s===2){if(ep>=hi||ep<=lo)return{apy:ba,zone:'base'};return{apy:ba+((hi-ep)/(hi-lo))*(ma-ba),zone:'in'};}
+  if(s===1){if(ep>=hi)return{apy:ma,zone:'in'};if(ep<=lo)return{apy:ba,zone:'base'};return{apy:ba+((ep-lo)/(hi-lo))*(ma-ba),zone:'in'};}
+  if(s===2){if(ep<=lo)return{apy:ma,zone:'in'};if(ep>=hi)return{apy:ba,zone:'base'};return{apy:ba+((hi-ep)/(hi-lo))*(ma-ba),zone:'in'};}
   return ep>=lo&&ep<=hi?{apy:ma,zone:'in'}:{apy:ba,zone:'out'};
 }
 
@@ -1211,7 +1211,7 @@ async function runBT(){
 
 function buildBtHTML(res,klines,totalEth,totalGain){
   const cF=totalEth+totalGain,pct=(totalGain/totalEth*100);
-  const sn=['\u9be2\u9b5a\u9170\u770b\u6f32','\u9be2\u9b5a\u9170\u770b\u8dcc','\u5340\u9593\u76c8\u5229'],sc=['var(--bull)','var(--bear)','var(--range)'];
+  const sn=['趨勢智盈看漲','趨勢智盈看跌','區間盈'],sc=['var(--bull)','var(--bear)','var(--range)'];
   const u3=unit();
   let h='<div class="bsm">';
   h+=`<div class="bst"><div class="bl">總回測天數</div><div class="bv" style="color:var(--acc)">${klines.length} 天</div></div>`;
@@ -1224,7 +1224,7 @@ function buildBtHTML(res,klines,totalEth,totalGain){
 
   // Trigger stats
   h+='<div class="tstat-grid">';
-  const snames=['\u7b56\u7565\u4e00\uff1a\u9be2\u9b5a\u9170\u770b\u6f32','\u7b56\u7565\u4e8c\uff1a\u9be2\u9b5a\u9170\u770b\u8dcc','\u7b56\u7565\u4e09\uff1a\u5340\u9593\u76c8\u5229'];
+  const snames=['策略一：趨勢智盈看漲','策略二：趨勢智盈看跌','策略三：區間盈'];
   const scs=['#22c55e','#ef4444','#f59e0b'];
   res.forEach((r,i)=>{
     const tot=r.totalCycles;
