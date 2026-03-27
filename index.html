@@ -296,6 +296,27 @@ input[type=number]:hover{border-color:var(--brd2+20);}
 .pbtn:hover,.pbtn.on{border-color:var(--acc);color:var(--acc);background:rgba(0,255,231,0.06);}
 .pbtn.on{box-shadow:0 0 10px rgba(0,255,231,0.1);}
 
+/* ── Date inputs ── */
+input[type=date].date-input{
+  background:rgba(0,0,0,0.4);
+  border:1px solid var(--brd2);
+  color:var(--txt);
+  border-radius:3px;
+  padding:6px 10px;
+  font-family:var(--mono);font-size:14px;
+  transition:border-color 0.2s,box-shadow 0.2s;
+  letter-spacing:1px;
+  color-scheme:dark;
+}
+input[type=date].date-input:focus{
+  outline:none;border-color:var(--acc);
+  box-shadow:0 0 0 1px rgba(0,255,231,0.2),0 0 20px rgba(0,255,231,0.1);
+}
+body.btc-theme input[type=date].date-input:focus{
+  border-color:var(--acc);
+  box-shadow:0 0 0 1px rgba(247,147,26,0.2),0 0 20px rgba(247,147,26,0.1);
+}
+
 /* ── Backtest ── */
 .bt-load{text-align:center;padding:40px;font-family:var(--mono);font-size:16px;color:var(--mut);letter-spacing:2px;}
 .spin{display:inline-block;width:28px;height:28px;border:1px solid var(--brd2);border-top-color:var(--acc);border-radius:50%;animation:sp 1s linear infinite;margin-bottom:12px;}
@@ -599,15 +620,28 @@ body.btc-theme .preset-active{background:rgba(247,147,26,0.12)!important;color:v
   <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
     <div>
       <label style="font-family:var(--mono);font-size:12px;color:var(--mut);letter-spacing:2px;">SELECT PERIOD</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-        <button class="pbtn on" onclick="selP('2y',this)">2024/01 – 2026/01 · 2YR</button>
-        <button class="pbtn" onclick="selP('1y',this)">2025/01 – 2026/01 · 1YR</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-family:var(--mono);font-size:11px;color:var(--mut);letter-spacing:1px;">FROM</label>
+          <input type="date" id="btDateStart" value="2023-01-01" min="2023-01-01" max="2026-03-27" class="date-input">
+        </div>
+        <span style="color:var(--mut);font-family:var(--mono);">→</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-family:var(--mono);font-size:11px;color:var(--mut);letter-spacing:1px;">TO</label>
+          <input type="date" id="btDateEnd" value="2026-03-27" min="2023-01-01" max="2026-03-27" class="date-input">
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+        <button class="pbtn" onclick="setDateRange('2023-01-01','2024-12-31',this)">2023-2024 · 2YR</button>
+        <button class="pbtn" onclick="setDateRange('2024-01-01','2025-12-31',this)">2024-2025 · 2YR</button>
+        <button class="pbtn" onclick="setDateRange('2025-01-01','2026-03-27',this)">2025-2026 · 1YR</button>
+        <button class="pbtn on" onclick="setDateRange('2023-01-01','2026-03-27',this)">全部 · 3YR</button>
       </div>
     </div>
     <button class="btn btnp" onclick="runBT()" style="align-self:flex-end;">▶ RUN BACKTEST</button>
   </div>
   <div style="font-family:var(--mono);font-size:13px;color:var(--mut);margin-bottom:14px;letter-spacing:1px;border-left:2px solid rgba(0,255,231,0.2);padding-left:10px;">
-    複利邏輯：每筆到期獲利即時滾入下一筆本金 · 7筆模式：pendingGain 精確累積 · S1/S2 觸發 = 到期日收盤價在區間內 · S3 觸發 = 持有期間所有 1h K線 High/Low 均在區間內 · 全部使用 1h K線資料回測
+    複利邏輯：每筆到期獲利即時滾入下一筆本金 · 7筆模式：pendingGain 精確累積 · S1/S2 觸發 = 到期前30分鐘價格在區間內 · S3 觸發 = 持有期間所有 1m K線 High/Low 均在區間內 · 使用本地 1m K線資料回測
   </div>
   <div id="btA"><div style="font-family:var(--mono);color:var(--mut);font-size:16px;padding:20px 0;letter-spacing:2px;">◈ AWAITING EXECUTION</div></div>
 </div>
@@ -915,49 +949,90 @@ function updSum(){
 }
 
 // ─── BACKTEST ─────────────────────────────────
-let btPeriod='2y';
-function selP(p,el){btPeriod=p;document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
-
-async function fetchKL(s0,e0){
-  const all=[];let cur=s0;
-  while(cur<e0){
-    const url='https://api.binance.com/api/v3/klines?symbol='+SYMBOL_CONFIG[currentSymbol].symbol+'&interval=1d&startTime='+cur+'&endTime='+e0+'&limit=500';
-    try{const r=await fetch(url),d=await r.json();if(!d||!d.length)break;
-      d.forEach(k=>{all.push({date:new Date(k[0]),open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4])});});
-      if(d.length<500)break;cur=d[d.length-1][0]+86400000;
-    }catch(e){break;}
-  }
-  return all;
+function setDateRange(start,end,el){
+  g('btDateStart').value=start;
+  g('btDateEnd').value=end;
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));
+  if(el)el.classList.add('on');
 }
 
-// Fetch 1h klines for S3 precision — store as {ts, high, low}
-async function fetchKL1h(s0,e0,progressCb){
-  const all=[];let cur=s0;
-  const HOUR=3600000;
-  while(cur<e0){
-    const url='https://api.binance.com/api/v3/klines?symbol='+SYMBOL_CONFIG[currentSymbol].symbol+'&interval=1h&startTime='+cur+'&endTime='+e0+'&limit=500';
+// Calculate month keys between two date strings
+function getMonthsBetween(startDate,endDate){
+  const months=[];
+  const sd=new Date(startDate),ed=new Date(endDate);
+  let y=sd.getUTCFullYear(),m=sd.getUTCMonth()+1;
+  const ey=ed.getUTCFullYear(),em=ed.getUTCMonth()+1;
+  while(y<ey||(y===ey&&m<=em)){
+    months.push(y+'-'+String(m).padStart(2,'0'));
+    m++;if(m>12){m=1;y++;}
+  }
+  return months;
+}
+
+// Load local 1m kline data from data/ directory
+async function loadLocal1mData(startDate,endDate,progressCb){
+  const sym=SYMBOL_CONFIG[currentSymbol].symbol;
+  const months=getMonthsBetween(startDate,endDate);
+  const all=[];
+  let loaded=0;
+  for(const mo of months){
+    const filename='data/'+sym+'_1m_'+mo+'.txt';
     try{
-      const r=await fetch(url),d=await r.json();
-      if(!d||!d.length)break;
-      d.forEach(k=>{all.push({ts:k[0],high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4])});});
-      if(progressCb) progressCb(all.length);
-      if(d.length<500)break;
-      cur=d[d.length-1][0]+HOUR;
-    }catch(e){break;}
-    // small yield to not block UI
+      const r=await fetch(filename);
+      if(!r.ok){loaded++;if(progressCb)progressCb(loaded,months.length);continue;}
+      const text=await r.text();
+      const lines=text.trim().split('\n');
+      for(const line of lines){
+        const p=line.split(',');
+        if(p.length>=5){
+          const ts=parseInt(p[0]),op=parseFloat(p[1]),hi=parseFloat(p[2]),lo=parseFloat(p[3]),cl=parseFloat(p[4]);
+          if(!isNaN(ts)&&!isNaN(cl)) all.push({ts,open:op,high:hi,low:lo,close:cl});
+        }
+      }
+    }catch(e){}
+    loaded++;
+    if(progressCb)progressCb(loaded,months.length);
     await new Promise(res=>setTimeout(res,0));
   }
+  all.sort((a,b)=>a.ts-b.ts);
   return all;
 }
 
-// Check if S3 stays in range for entire period using 1h candles
-// Returns true if ALL 1h candles in [startMs, endMs] have low>=lo AND high<=hi
-function s3InRange(klines1h, startMs, endMs, lo, hi){
-  // binary search for start index
-  let left=0,right=klines1h.length-1,startIdx=klines1h.length;
-  while(left<=right){const m=(left+right)>>1;if(klines1h[m].ts>=startMs){startIdx=m;right=m-1;}else left=m+1;}
-  for(let i=startIdx;i<klines1h.length;i++){
-    const k=klines1h[i];
+// Build daily klines from 1m data
+function buildDailyKlines(klines1m){
+  const map={};
+  klines1m.forEach(k=>{
+    const dk=new Date(k.ts).toISOString().slice(0,10);
+    if(!map[dk]) map[dk]={date:new Date(dk+'T00:00:00Z'),open:k.open,high:k.high,low:k.low,close:k.close};
+    else{
+      map[dk].high=Math.max(map[dk].high,k.high);
+      map[dk].low=Math.min(map[dk].low,k.low);
+      map[dk].close=k.close;
+    }
+  });
+  return Object.values(map).sort((a,b)=>a.date-b.date);
+}
+
+// Get price 30 minutes before expiry (08:00 UTC settlement → target 07:30 UTC)
+function getPrice30mBefore(klines1m,expiryDate){
+  const targetMs=expiryDate.getTime()+8*3600000-30*60000; // 07:30 UTC on expiry date
+  let left=0,right=klines1m.length-1,best=-1;
+  while(left<=right){
+    const mid=(left+right)>>1;
+    if(klines1m[mid].ts<=targetMs){best=mid;left=mid+1;}
+    else right=mid-1;
+  }
+  if(best>=0) return klines1m[best].close;
+  return null;
+}
+
+// Check if S3 stays in range using 1m candles
+// Returns true if ALL 1m candles in [startMs, endMs] have low>=lo AND high<=hi
+function s3InRange(klines1m, startMs, endMs, lo, hi){
+  let left=0,right=klines1m.length-1,startIdx=klines1m.length;
+  while(left<=right){const m=(left+right)>>1;if(klines1m[m].ts>=startMs){startIdx=m;right=m-1;}else left=m+1;}
+  for(let i=startIdx;i<klines1m.length;i++){
+    const k=klines1m[i];
     if(k.ts>endMs)break;
     if(k.low<lo||k.high>hi)return false;
   }
@@ -973,28 +1048,36 @@ function apyVal(s,ep,lo,hi){
 
 async function runBT(){
   const area=g('btA');
-  const e0ms=new Date('2026-01-01T00:00:00Z').getTime();
-  const s0=btPeriod==='2y'?new Date('2024-01-01T00:00:00Z'):new Date('2025-01-01T00:00:00Z');
-  const s0ms=s0.getTime();
+  const startDate=g('btDateStart').value;
+  const endDate=g('btDateEnd').value;
 
-  area.innerHTML='<div class="bt-load"><div class="spin"></div><br>抓取 1h K線資料... <span id="h1prog">0</span> 根</div>';
-  const klines1h=await fetchKL1h(s0ms,e0ms,(n)=>{const el=document.getElementById('h1prog');if(el)el.textContent=n;});
-  if(klines1h.length<24){area.innerHTML='<div style="color:var(--bear);padding:20px;">無法連線 Binance API，請檢查網路。</div>';return;}
+  if(!startDate||!endDate||startDate>=endDate){
+    area.innerHTML='<div style="color:var(--bear);padding:20px;">請選擇有效的日期範圍。</div>';
+    return;
+  }
 
-  // Build daily klines from 1h data (use last candle of each day as close)
-  const klinesMap={};
-  klines1h.forEach(k=>{
-    const d=new Date(k.ts);
-    const dk=d.toISOString().slice(0,10);
-    if(!klinesMap[dk]) klinesMap[dk]={date:new Date(dk+'T00:00:00Z'),high:k.high,low:k.low,close:k.close||k.high};
-    else{
-      klinesMap[dk].high=Math.max(klinesMap[dk].high,k.high);
-      klinesMap[dk].low=Math.min(klinesMap[dk].low,k.low);
-      klinesMap[dk].close=k.close||k.high;
-    }
+  // Load local 1m data
+  const totalMonths=getMonthsBetween(startDate,endDate).length;
+  area.innerHTML='<div class="bt-load"><div class="spin"></div><br>載入本地 1m K線資料... <span id="h1prog">0</span> / '+totalMonths+' 月</div>';
+
+  const allKlines1m=await loadLocal1mData(startDate,endDate,(loaded,total)=>{
+    const el=document.getElementById('h1prog');if(el)el.textContent=loaded;
   });
-  const klines=Object.values(klinesMap).sort((a,b)=>a.date-b.date);
-  area.innerHTML='<div class="bt-load"><div class="spin"></div><br>計算回測中...</div>';
+
+  // Filter to exact date range
+  const startMs=new Date(startDate+'T00:00:00Z').getTime();
+  const endMs=new Date(endDate+'T23:59:59Z').getTime();
+  const klines1m=allKlines1m.filter(k=>k.ts>=startMs&&k.ts<=endMs);
+
+  if(klines1m.length<1440){
+    area.innerHTML='<div style="color:var(--bear);padding:20px;">資料不足（僅 '+klines1m.length+' 根 1m K線），請確認 data/ 目錄中有對應的文件。<br>格式：data/'+SYMBOL_CONFIG[currentSymbol].symbol+'_1m_YYYY-MM.txt</div>';
+    return;
+  }
+
+  // Build daily klines from 1m data
+  const klines=buildDailyKlines(klines1m);
+  area.innerHTML='<div class="bt-load"><div class="spin"></div><br>計算回測中... '+klines.length+' 天 · '+(klines1m.length/1000).toFixed(0)+'k 根 1m K線</div>';
+  await new Promise(res=>setTimeout(res,50));
 
   const totalEth=gv('totalEth');
   const allResults=[];
@@ -1003,21 +1086,21 @@ async function runBT(){
     const alloc=gv('allocS'+s)/100,days=Math.max(1,Math.round(gv('s'+s+'-days'))||7);
     const mode=modes[s],lr=gv('s'+s+'-lr'),ur=gv('s'+s+'-ur');
     const fixLo=gv('s'+s+'-lo'),fixHi=gv('s'+s+'-hi');
-    let ethAmt=totalEth*alloc; // starts here, grows with compounding
+    let ethAmt=totalEth*alloc;
     const logs=[];
 
-    // Trigger counters
     let cntIn=0,cntBase=0,cntAbove=0,cntBelow=0;
 
     if(mode==='single'){
       let pool=ethAmt,i=0;
       while(i+days-1<klines.length){
         const sk=klines[i],ek=klines[Math.min(i+days-1,klines.length-1)];
-        const ep=ek.close;
+        // S1/S2: use price 30min before expiry; S3: daily range check
+        const ep30=getPrice30mBefore(klines1m,ek.date);
+        const ep=(s<3&&ep30!==null)?ep30:ek.close;
         let avResult;
         if(s===3){
-          // S3: check entire holding period using 1h candles
-          const inR=s3InRange(klines1h,sk.date.getTime(),ek.date.getTime()+86399999,fixLo,fixHi);
+          const inR=s3InRange(klines1m,sk.date.getTime(),ek.date.getTime()+86399999,fixLo,fixHi);
           const ba3=gv('s3-oa'),ma3=gv('s3-ia');
           avResult={apy:inR?ma3:ba3,zone:inR?'in':'out'};
         }else{
@@ -1033,26 +1116,15 @@ async function runBT(){
       allResults.push({s,mode,logs,initEth:ethAmt,finalEth:logs.length?logs[logs.length-1].pool:ethAmt,cntIn,cntBase,cntAbove,cntBelow,totalCycles:logs.length});
     }else{
       // 7-batch rolling with compounding
-      // Track a running "pool" that grows each time a batch expires
-      // On day i: launch batch i. It expires on day i+days-1.
-      // Each batch uses 1/7 of current pool at launch time.
-      // When batch expires, gain = batchAmt*(apy/100)*(days/365), add to pool.
       const N=klines.length;
-      const pool=[totalEth*alloc]; // pool[day] after day's settlements
+      const pool=[totalEth*alloc];
       for(let d2=1;d2<N;d2++)pool.push(pool[d2-1]);
 
-      // First pass: for each batch launched on day i, record expiry gain on day i+days-1
       const dayGain=new Array(N).fill(0);
       const batchLogs=[];
-      // We need pool size at launch time; but pool depends on previous gains.
-      // We approximate: batch amount = pool[i]/7 at launch day i.
-      // Recompute iteratively:
       const poolArr=new Array(N).fill(0);
       poolArr[0]=totalEth*alloc;
 
-      // Two-pass: first compute gains, then accumulate pool
-      // Actually do it day by day:
-      // Each day, settle batches expiring today, then update pool
       const batchAmtAtLaunch=new Array(N).fill(0);
       const batchExpGain=new Array(N).fill(0);
       const batchZone=new Array(N).fill('base');
@@ -1061,32 +1133,29 @@ async function runBT(){
       const batchHi=new Array(N).fill(0);
 
       // Day-by-day simulation — 正確複利邏輯
-      // 每天同時有最多 days 筆在跑，每筆本金 = 啟動當日 pool/nPools
-      // 到期那天把獲利滾回 pool，次日起的新筆本金自動變大
-      // pendingGain 要夠大，容納 N+days 天
       const nPools = pools[s]||7;
       const pendingGain = new Array(N + days + 1).fill(0);
       const poolByDay = new Array(N).fill(0);
       let runPool = totalEth * alloc;
 
       for(let d2=0;d2<N;d2++){
-        // Step 1: 今天到期批次獲利滾入 pool
         runPool += pendingGain[d2];
         poolByDay[d2] = runPool;
 
-        // Step 2: 今天啟動新批次，本金 = 當前 pool / 7
         const bAmt = runPool / nPools;
         batchAmtAtLaunch[d2] = bAmt;
         const entryP = klines[d2].close;
         batchLo[d2] = entryP * lr;
         batchHi[d2] = entryP * ur;
         const expIdx = Math.min(d2 + days - 1, N - 1);
-        const ep = klines[expIdx].close;
+        // S1/S2: use price 30min before expiry
+        const ep30=getPrice30mBefore(klines1m,klines[expIdx].date);
+        const ep=(s<3&&ep30!==null)?ep30:klines[expIdx].close;
         let avR2;
         if(s===3){
           const startMs3=klines[d2].date.getTime();
           const endMs3=klines[expIdx].date.getTime()+86399999;
-          const inR3=s3InRange(klines1h,startMs3,endMs3,batchLo[d2],batchHi[d2]);
+          const inR3=s3InRange(klines1m,startMs3,endMs3,batchLo[d2],batchHi[d2]);
           const ba3=gv('s3-oa'),ma3=gv('s3-ia');
           avR2={apy:inR3?ma3:ba3,zone:inR3?'in':'out'};
         }else{
@@ -1107,26 +1176,26 @@ async function runBT(){
           if(s===2 && ep < batchLo[d2]) cntBelow++;
         }
       }
-      // 最終：把 poolByDay 最後一天之後還未被 d2 迴圈處理到的收益加入
-      // (d2 迴圈結束時 d2=N，還差 pendingGain[N..N+days-1])
       let finalPool = poolByDay[N-1];
       for(let d2=N; d2<N+days; d2++) finalPool += pendingGain[d2];
 
-      // Build logs（每筆顯示：批次本金、個別獲利、到期當日累計pool）
+      // Build logs — ep uses 30min-before price for S1/S2
       for(let d2=0;d2<N;d2++){
         const expIdx = Math.min(d2 + days - 1, N - 1);
+        const ep30=getPrice30mBefore(klines1m,klines[expIdx].date);
+        const epLog=(s<3&&ep30!==null)?ep30:klines[expIdx].close;
         const bRet = batchAmtAtLaunch[d2] * (batchAPY[d2] / 100) * (days / 365);
         logs.push({
           date: klines[d2].date.toISOString().slice(0,10),
           expDate: klines[expIdx].date.toISOString().slice(0,10),
           sp: klines[d2].close,
-          ep: klines[expIdx].close,
+          ep: epLog,
           lo: Math.round(batchLo[d2]),
           hi: Math.round(batchHi[d2]),
           apy: batchAPY[d2],
           batchAmt: batchAmtAtLaunch[d2],
           ret: bRet,
-          pool: poolByDay[expIdx], // pool 在到期當天的值（含今日結算）
+          pool: poolByDay[expIdx],
           zone: batchZone[d2], s
         });
       }
@@ -1134,7 +1203,7 @@ async function runBT(){
     }
   }
 
-  window._btK=klines;window._btK1h=klines1h;window._btR=allResults;
+  window._btK=klines;window._btK1m=klines1m;window._btR=allResults;
   const totalGain=allResults.reduce((a,r)=>a+r.finalEth-r.initEth,0);
   area.innerHTML=buildBtHTML(allResults,klines,totalEth,totalGain);
   setTimeout(()=>drawBtP('bpC',klines,allResults),80);
